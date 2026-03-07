@@ -65,6 +65,7 @@ class SaberBleManager(
     private var notifyCharacteristic: BluetoothGattCharacteristic? = null
     private var activeScanCallback: ScanCallback? = null
     private val parser = FramedResponseParser()
+    private val seenScanDevices = linkedSetOf<String>()
 
     private val commandMutex = Mutex()
     @Volatile private var pendingResponse: CompletableDeferred<String>? = null
@@ -177,6 +178,7 @@ class SaberBleManager(
 
         disconnect()
         parser.clear()
+        seenScanDevices.clear()
         updateState(ConnectionState.SCANNING)
 
         val scanner = adapter.bluetoothLeScanner
@@ -190,6 +192,7 @@ class SaberBleManager(
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val device = result.device ?: return
                 val scanName = result.scanRecord?.deviceName
+                logScanDevice(device.address, device.name, scanName)
                 if (!matchesTarget(device.name, scanName)) return
 
                 log("Found target ${device.address} (${device.name ?: scanName ?: "unknown"})")
@@ -206,17 +209,12 @@ class SaberBleManager(
 
         activeScanCallback = callback
 
-        val filters = listOf(
-            ScanFilter.Builder()
-                .setDeviceName(targetDeviceName)
-                .build()
-        )
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
 
         log("Starting scan for $targetDeviceName")
-        scanner.startScan(filters, settings, callback)
+        scanner.startScan(null, settings, callback)
         mainHandler.postDelayed(scanTimeoutRunnable, scanTimeoutMs)
     }
 
@@ -337,8 +335,32 @@ class SaberBleManager(
     }
 
     private fun matchesTarget(deviceName: String?, scanRecordName: String?): Boolean {
-        return targetDeviceName.equals(deviceName, ignoreCase = true) ||
-            targetDeviceName.equals(scanRecordName, ignoreCase = true)
+        val target = normalizeName(targetDeviceName) ?: return false
+        return listOfNotNull(normalizeName(deviceName), normalizeName(scanRecordName))
+            .any { candidate ->
+                candidate.equals(target, ignoreCase = true) ||
+                    candidate.contains(target, ignoreCase = true)
+            }
+    }
+
+    private fun logScanDevice(address: String, deviceName: String?, scanRecordName: String?) {
+        val normalizedDeviceName = normalizeName(deviceName)
+        val normalizedScanName = normalizeName(scanRecordName)
+        if (normalizedDeviceName == null && normalizedScanName == null) return
+
+        val key = "$address|${normalizedDeviceName ?: "-"}|${normalizedScanName ?: "-"}"
+        if (!seenScanDevices.add(key)) return
+
+        log(
+            "Scan saw $address deviceName=${normalizedDeviceName ?: "-"} " +
+                "scanName=${normalizedScanName ?: "-"}"
+        )
+    }
+
+    private fun normalizeName(name: String?): String? {
+        return name
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
     }
 
     @SuppressLint("MissingPermission")

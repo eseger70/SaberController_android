@@ -190,6 +190,14 @@ class SaberBleManager(
         parser.clear()
         clearDiscoveredDevices()
         seenScanDevices.clear()
+
+        val bondedTarget = findBondedTarget(adapter)
+        if (bondedTarget != null) {
+            log("Using bonded target ${bondedTarget.address} (${normalizeName(bondedTarget.name) ?: "unknown"})")
+            connectGatt(bondedTarget)
+            return
+        }
+
         updateState(ConnectionState.SCANNING)
 
         val scanner = adapter.bluetoothLeScanner
@@ -375,6 +383,23 @@ class SaberBleManager(
                 candidate.equals(target, ignoreCase = true) ||
                     candidate.contains(target, ignoreCase = true)
             }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun findBondedTarget(adapter: BluetoothAdapter): BluetoothDevice? {
+        val bondedDevices = adapter.bondedDevices ?: emptySet()
+        if (bondedDevices.isEmpty()) {
+            log("No bonded Bluetooth devices available")
+            return null
+        }
+
+        for (device in bondedDevices.sortedBy { normalizeName(it.name) ?: it.address }) {
+            log("Bonded device ${device.address} name=${normalizeName(device.name) ?: "-"}")
+        }
+
+        return bondedDevices.firstOrNull { device ->
+            matchesTarget(device.name, null)
+        }
     }
 
     private fun logScanDevice(address: String, deviceName: String?, scanRecordName: String?) {

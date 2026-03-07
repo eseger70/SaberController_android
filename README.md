@@ -50,6 +50,7 @@ Wrapper files are now included, so CLI builds can use:
 
 The first wrapper run will download Gradle automatically. A local JDK is still required.
 GitHub Actions CI is also configured to run unit tests and build a debug APK on pushes and pull requests.
+For local CLI builds, Android SDK path must also be configured via Android Studio, `ANDROID_HOME`, or `local.properties`.
 
 ## Usage
 

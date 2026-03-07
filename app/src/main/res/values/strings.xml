@@ -9,6 +9,9 @@
     <string name="refresh_now_playing">Now Playing</string>
     <string name="stop_track">Stop Track</string>
     <string name="connection_state_label">Connection status</string>
+    <string name="nearby_devices_label">Nearby BLE devices</string>
+    <string name="nearby_device_count_empty">0 devices</string>
+    <string name="nearby_device_name_unknown">Unnamed device</string>
     <string name="saber_state_label">Saber state</string>
     <string name="now_playing_label">Now playing</string>
     <string name="track_list_label">Track list</string>

@@ -41,6 +41,28 @@
             android:text="@string/disconnect" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/textNearbyDevicesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/nearby_devices_label"
+        android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+
+    <TextView
+        android:id="@+id/textNearbyDeviceCountValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/nearby_device_count_empty"
+        android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+
+    <ListView
+        android:id="@+id/listDiscoveredDevices"
+        android:layout_width="match_parent"
+        android:layout_height="112dp"
+        android:layout_marginTop="8dp"
+        android:dividerHeight="1dp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

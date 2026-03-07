@@ -21,8 +21,11 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleManager: SaberBleManager
+    private lateinit var scanDeviceAdapter: ArrayAdapter<String>
     private lateinit var trackAdapter: ArrayAdapter<String>
 
+    private val discoveredDeviceLabels = mutableListOf<String>()
+    private val discoveredDeviceAddresses = mutableListOf<String>()
     private val logLines = ArrayDeque<String>()
     private val trackPaths = mutableListOf<String>()
     private var pendingPermissionAction: (() -> Unit)? = null
@@ -48,11 +51,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bleManager = SaberBleManager(applicationContext)
+        scanDeviceAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_1,
+            discoveredDeviceLabels
+        )
         trackAdapter = ArrayAdapter(
             this,
             android.R.layout.simple_list_item_activated_1,
             trackPaths
         )
+        binding.listDiscoveredDevices.adapter = scanDeviceAdapter
+        binding.listDiscoveredDevices.setOnItemClickListener { _, _, position, _ ->
+            val address = discoveredDeviceAddresses.getOrNull(position) ?: return@setOnItemClickListener
+            runWithBlePermissions {
+                bleManager.connectToDiscoveredDevice(address)
+            }
+        }
         binding.listTracks.adapter = trackAdapter
         binding.listTracks.setOnItemClickListener { _, _, position, _ ->
             val trackPath = trackPaths.getOrNull(position) ?: return@setOnItemClickListener
@@ -63,6 +78,7 @@ class MainActivity : AppCompatActivity() {
 
         wireUi()
         collectBleState()
+        updateDiscoveredDevices(emptyList())
         updateTrackList(emptyList())
         updateNowPlaying(null)
         updateUiForConnectionState(ConnectionState.DISCONNECTED)
@@ -137,6 +153,11 @@ class MainActivity : AppCompatActivity() {
                 launch {
                     bleManager.logs.collect { line ->
                         appendLog(line)
+                    }
+                }
+                launch {
+                    bleManager.discoveredDevices.collect { devices ->
+                        updateDiscoveredDevices(devices)
                     }
                 }
             }
@@ -252,6 +273,40 @@ class MainActivity : AppCompatActivity() {
         updateNowPlaying(currentNowPlaying)
     }
 
+    private fun updateDiscoveredDevices(devices: List<SaberBleManager.ScannedDevice>) {
+        discoveredDeviceAddresses.clear()
+        discoveredDeviceLabels.clear()
+
+        for (device in devices) {
+            discoveredDeviceAddresses.add(device.address)
+            discoveredDeviceLabels.add(buildDiscoveredDeviceLabel(device))
+        }
+        scanDeviceAdapter.notifyDataSetChanged()
+
+        binding.textNearbyDeviceCountValue.text = if (devices.isEmpty()) {
+            getString(R.string.nearby_device_count_empty)
+        } else {
+            "${devices.size} devices"
+        }
+
+        val state = bleManager.connectionState.value
+        binding.listDiscoveredDevices.isEnabled =
+            (state == ConnectionState.SCANNING || state == ConnectionState.DISCONNECTED) &&
+                devices.isNotEmpty()
+    }
+
+    private fun buildDiscoveredDeviceLabel(device: SaberBleManager.ScannedDevice): String {
+        val primaryName = device.deviceName
+            ?: device.scanRecordName
+            ?: getString(R.string.nearby_device_name_unknown)
+        val secondaryName = device.scanRecordName
+            ?.takeIf { it != device.deviceName }
+            ?.let { " scan=$it" }
+            .orEmpty()
+
+        return "$primaryName$secondaryName | ${device.address} | RSSI ${device.rssi}"
+    }
+
     private fun updateNowPlaying(trackPath: String?) {
         val normalizedTrack = trackPath?.takeIf { it.isNotBlank() }
         binding.textNowPlayingValue.text = normalizedTrack ?: getString(R.string.state_none)
@@ -278,6 +333,9 @@ class MainActivity : AppCompatActivity() {
         binding.buttonRefreshNowPlaying.isEnabled = ready
         binding.buttonStopTrack.isEnabled = ready
         binding.listTracks.isEnabled = ready && trackPaths.isNotEmpty()
+        binding.listDiscoveredDevices.isEnabled =
+            (state == ConnectionState.SCANNING || state == ConnectionState.DISCONNECTED) &&
+                discoveredDeviceAddresses.isNotEmpty()
     }
 
     private fun appendLog(line: String) {

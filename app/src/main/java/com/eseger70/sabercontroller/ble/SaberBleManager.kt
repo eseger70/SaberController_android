@@ -12,7 +12,6 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
@@ -54,6 +53,13 @@ class SaberBleManager(
         val attempts: Int = 0
     )
 
+    data class ScannedDevice(
+        val address: String,
+        val deviceName: String?,
+        val scanRecordName: String?,
+        val rssi: Int
+    )
+
     private val appContext = context.applicationContext
     private val bluetoothManager = appContext.getSystemService(BluetoothManager::class.java)
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
@@ -66,12 +72,16 @@ class SaberBleManager(
     private var activeScanCallback: ScanCallback? = null
     private val parser = FramedResponseParser()
     private val seenScanDevices = linkedSetOf<String>()
+    private val scannedBleDevices = linkedMapOf<String, BluetoothDevice>()
+    private val scannedDeviceInfo = linkedMapOf<String, ScannedDevice>()
 
     private val commandMutex = Mutex()
     @Volatile private var pendingResponse: CompletableDeferred<String>? = null
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState = _connectionState.asStateFlow()
+    private val _discoveredDevices = MutableStateFlow<List<ScannedDevice>>(emptyList())
+    val discoveredDevices = _discoveredDevices.asStateFlow()
 
     private val _logs = MutableSharedFlow<String>(extraBufferCapacity = 256)
     val logs = _logs.asSharedFlow()
@@ -178,6 +188,7 @@ class SaberBleManager(
 
         disconnect()
         parser.clear()
+        clearDiscoveredDevices()
         seenScanDevices.clear()
         updateState(ConnectionState.SCANNING)
 
@@ -192,6 +203,7 @@ class SaberBleManager(
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val device = result.device ?: return
                 val scanName = result.scanRecord?.deviceName
+                upsertScannedDevice(device, scanName, result.rssi)
                 logScanDevice(device.address, device.name, scanName)
                 if (!matchesTarget(device.name, scanName)) return
 
@@ -216,6 +228,28 @@ class SaberBleManager(
         log("Starting scan for $targetDeviceName")
         scanner.startScan(null, settings, callback)
         mainHandler.postDelayed(scanTimeoutRunnable, scanTimeoutMs)
+    }
+
+    @SuppressLint("MissingPermission")
+    fun connectToDiscoveredDevice(address: String): Boolean {
+        val device = scannedBleDevices[address]
+        if (device == null) {
+            log("No scanned device available for $address")
+            return false
+        }
+        if (_connectionState.value == ConnectionState.READY ||
+            _connectionState.value == ConnectionState.CONNECTING ||
+            _connectionState.value == ConnectionState.DISCOVERING
+        ) {
+            log("Already connecting/connected")
+            return false
+        }
+
+        stopScan()
+        parser.clear()
+        log("Connecting to scanned device $address")
+        connectGatt(device)
+        return true
     }
 
     @SuppressLint("MissingPermission")
@@ -355,6 +389,27 @@ class SaberBleManager(
             "Scan saw $address deviceName=${normalizedDeviceName ?: "-"} " +
                 "scanName=${normalizedScanName ?: "-"}"
         )
+    }
+
+    private fun upsertScannedDevice(device: BluetoothDevice, scanRecordName: String?, rssi: Int) {
+        val scannedDevice = ScannedDevice(
+            address = device.address,
+            deviceName = normalizeName(device.name),
+            scanRecordName = normalizeName(scanRecordName),
+            rssi = rssi
+        )
+        val previous = scannedDeviceInfo[device.address]
+        if (previous == scannedDevice) return
+
+        scannedBleDevices[device.address] = device
+        scannedDeviceInfo[device.address] = scannedDevice
+        _discoveredDevices.value = scannedDeviceInfo.values.sortedBy { it.address }
+    }
+
+    private fun clearDiscoveredDevices() {
+        scannedBleDevices.clear()
+        scannedDeviceInfo.clear()
+        _discoveredDevices.value = emptyList()
     }
 
     private fun normalizeName(name: String?): String? {

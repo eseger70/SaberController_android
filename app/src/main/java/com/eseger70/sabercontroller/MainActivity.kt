@@ -5,30 +5,72 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.widget.ArrayAdapter
+import android.widget.AdapterView
+import android.widget.SeekBar
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.ble.SaberBleManager.ConnectionState
 import com.eseger70.sabercontroller.ble.SaberCommandResponseParser
-import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.databinding.ActivityMainBinding
+import com.eseger70.sabercontroller.databinding.PageSaberBinding
+import com.eseger70.sabercontroller.databinding.PageTracksBinding
+import com.eseger70.sabercontroller.ui.MainPagerAdapter
+import com.eseger70.sabercontroller.ui.SectionedListAdapter
+import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleManager: SaberBleManager
-    private lateinit var scanDeviceAdapter: ArrayAdapter<String>
-    private lateinit var trackAdapter: ArrayAdapter<String>
+    private lateinit var pagerAdapter: MainPagerAdapter
 
-    private val discoveredDeviceLabels = mutableListOf<String>()
-    private val discoveredDeviceAddresses = mutableListOf<String>()
     private val logLines = ArrayDeque<String>()
-    private val trackPaths = mutableListOf<String>()
     private var pendingPermissionAction: (() -> Unit)? = null
+    private var currentConnectionState: ConnectionState = ConnectionState.DISCONNECTED
+    private var suppressVolumeCallbacks = false
+
+    private var saberPageBinding: PageSaberBinding? = null
+    private var tracksPageBinding: PageTracksBinding? = null
+
+    private val presetAdapter by lazy {
+        SectionedListAdapter<SaberCommandResponseParser.PresetRow>(
+            context = this,
+            labelProvider = { row -> row.label },
+            headerProvider = { row -> row is SaberCommandResponseParser.PresetRow.Header },
+            enabledProvider = { row -> row is SaberCommandResponseParser.PresetRow.Preset }
+        )
+    }
+    private val trackAdapter by lazy {
+        SectionedListAdapter<SaberCommandResponseParser.TrackRow>(
+            context = this,
+            labelProvider = { row ->
+                when (row) {
+                    is SaberCommandResponseParser.TrackRow.Header -> row.title
+                    is SaberCommandResponseParser.TrackRow.Track -> row.displayName
+                }
+            },
+            headerProvider = { row -> row is SaberCommandResponseParser.TrackRow.Header },
+            enabledProvider = { row -> row is SaberCommandResponseParser.TrackRow.Track }
+        )
+    }
+
+    private var bladeState: Boolean? = null
+    private var saberStatus: String = ""
+    private var trackStatus: String = ""
+    private var nowPlaying: String? = null
+    private var currentPresetIndex: Int? = null
+    private var currentVolume: Int? = null
+
+    private var presetEntries: List<SaberCommandResponseParser.PresetEntry> = emptyList()
+    private var presetRows: List<SaberCommandResponseParser.PresetRow> = emptyList()
+    private var trackPaths: List<String> = emptyList()
+    private var trackRows: List<SaberCommandResponseParser.TrackRow> = emptyList()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -51,39 +93,11 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bleManager = SaberBleManager(applicationContext)
-        scanDeviceAdapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_list_item_1,
-            discoveredDeviceLabels
-        )
-        trackAdapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_list_item_activated_1,
-            trackPaths
-        )
-        binding.listDiscoveredDevices.adapter = scanDeviceAdapter
-        binding.listDiscoveredDevices.setOnItemClickListener { _, _, position, _ ->
-            val address = discoveredDeviceAddresses.getOrNull(position) ?: return@setOnItemClickListener
-            runWithBlePermissions {
-                bleManager.connectToDiscoveredDevice(address)
-            }
-        }
-        binding.listTracks.adapter = trackAdapter
-        binding.listTracks.setOnItemClickListener { _, _, position, _ ->
-            val trackPath = trackPaths.getOrNull(position) ?: return@setOnItemClickListener
-            runWithBlePermissions {
-                playTrack(trackPath)
-            }
-        }
-
-        wireUi()
+        setupPager()
+        wireCommonUi()
         collectBleState()
-        updateDiscoveredDevices(emptyList())
-        updateTrackList(emptyList())
-        updateNowPlaying(null)
-        updateUiForConnectionState(ConnectionState.DISCONNECTED)
-
-        appendLog("Ready. Tap Connect to scan for FEASYCOM")
+        renderAll()
+        appendLog("Ready. Connect to the paired FEASYCOM saber or scan fallback")
     }
 
     override fun onDestroy() {
@@ -91,7 +105,24 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun wireUi() {
+    private fun setupPager() {
+        pagerAdapter = MainPagerAdapter(
+            onSaberPageBound = { pageBinding -> bindSaberPage(pageBinding) },
+            onTracksPageBound = { pageBinding -> bindTracksPage(pageBinding) }
+        )
+        binding.viewPager.adapter = pagerAdapter
+        binding.viewPager.offscreenPageLimit = 1
+
+        TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
+            tab.text = if (position == 0) {
+                getString(R.string.tab_saber)
+            } else {
+                getString(R.string.tab_tracks)
+            }
+        }.attach()
+    }
+
+    private fun wireCommonUi() {
         binding.buttonConnect.setOnClickListener {
             runWithBlePermissions {
                 bleManager.connectToTarget()
@@ -103,42 +134,114 @@ class MainActivity : AppCompatActivity() {
                 bleManager.disconnect()
             }
         }
+    }
 
-        binding.buttonOn.setOnClickListener {
-            runWithBlePermissions {
-                setBladePower(isOn = true)
-            }
+    private fun bindSaberPage(pageBinding: PageSaberBinding) {
+        saberPageBinding = pageBinding
+        if (pageBinding.listPresets.adapter !== presetAdapter) {
+            pageBinding.listPresets.adapter = presetAdapter
         }
 
-        binding.buttonOff.setOnClickListener {
+        pageBinding.buttonOn.setOnClickListener {
             runWithBlePermissions {
-                setBladePower(isOn = false)
+                launchBleTask { setBladePowerInternal(isOn = true) }
             }
+        }
+        pageBinding.buttonOff.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { setBladePowerInternal(isOn = false) }
+            }
+        }
+        pageBinding.buttonSyncSaber.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { syncSaberPageInternal() }
+            }
+        }
+        pageBinding.buttonRefreshVolume.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { refreshVolumeInternal() }
+            }
+        }
+        pageBinding.listPresets.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+            val row = presetRows.getOrNull(position)
+            if (row is SaberCommandResponseParser.PresetRow.Preset) {
+                runWithBlePermissions {
+                    launchBleTask { selectPresetInternal(row.entry) }
+                }
+            }
+        }
+        pageBinding.seekVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || suppressVolumeCallbacks) return
+                pageBinding.textVolumeValue.text = progress.toString()
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                if (suppressVolumeCallbacks) return
+                val targetVolume = seekBar?.progress ?: return
+                runWithBlePermissions {
+                    launchBleTask { setVolumeInternal(targetVolume) }
+                }
+            }
+        })
+
+        renderSaberPage(pageBinding)
+    }
+
+    private fun bindTracksPage(pageBinding: PageTracksBinding) {
+        tracksPageBinding = pageBinding
+        if (pageBinding.listTracks.adapter !== trackAdapter) {
+            pageBinding.listTracks.adapter = trackAdapter
         }
 
-        binding.buttonGetState.setOnClickListener {
+        pageBinding.buttonRefreshTracks.setOnClickListener {
             runWithBlePermissions {
-                refreshBladeState()
+                launchBleTask { refreshTrackListInternal() }
             }
         }
+        pageBinding.buttonRefreshNowPlaying.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { refreshNowPlayingInternal() }
+            }
+        }
+        pageBinding.buttonStopTrack.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { stopTrackInternal() }
+            }
+        }
+        pageBinding.buttonRefreshVolume.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { refreshVolumeInternal() }
+            }
+        }
+        pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+            val row = trackRows.getOrNull(position)
+            if (row is SaberCommandResponseParser.TrackRow.Track) {
+                runWithBlePermissions {
+                    launchBleTask { playTrackInternal(row.path) }
+                }
+            }
+        }
+        pageBinding.seekVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || suppressVolumeCallbacks) return
+                pageBinding.textVolumeValue.text = progress.toString()
+            }
 
-        binding.buttonRefreshTracks.setOnClickListener {
-            runWithBlePermissions {
-                refreshTrackList()
-            }
-        }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
 
-        binding.buttonRefreshNowPlaying.setOnClickListener {
-            runWithBlePermissions {
-                refreshNowPlaying()
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                if (suppressVolumeCallbacks) return
+                val targetVolume = seekBar?.progress ?: return
+                runWithBlePermissions {
+                    launchBleTask { setVolumeInternal(targetVolume) }
+                }
             }
-        }
+        })
 
-        binding.buttonStopTrack.setOnClickListener {
-            runWithBlePermissions {
-                stopTrack()
-            }
-        }
+        renderTracksPage(pageBinding)
     }
 
     private fun collectBleState() {
@@ -146,8 +249,33 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     bleManager.connectionState.collect { state ->
+                        val previous = currentConnectionState
+                        currentConnectionState = state
                         binding.textConnectionStateValue.text = state.name
-                        updateUiForConnectionState(state)
+                        binding.buttonConnect.isEnabled = state == ConnectionState.DISCONNECTED
+                        binding.buttonDisconnect.isEnabled = state != ConnectionState.DISCONNECTED
+                        renderAll()
+
+                        if (state == ConnectionState.READY && previous != ConnectionState.READY) {
+                            saberStatus = "Connected. Syncing saber data..."
+                            trackStatus = "Connected. Syncing track data..."
+                            renderAll()
+                            launchBleTask { syncAllDataInternal() }
+                        }
+
+                        if (state == ConnectionState.DISCONNECTED && previous != ConnectionState.DISCONNECTED) {
+                            bladeState = null
+                            nowPlaying = null
+                            currentPresetIndex = null
+                            currentVolume = null
+                            presetEntries = emptyList()
+                            presetRows = emptyList()
+                            trackPaths = emptyList()
+                            trackRows = emptyList()
+                            saberStatus = "Disconnected"
+                            trackStatus = "Disconnected"
+                            renderAll()
+                        }
                     }
                 }
                 launch {
@@ -155,187 +283,359 @@ class MainActivity : AppCompatActivity() {
                         appendLog(line)
                     }
                 }
-                launch {
-                    bleManager.discoveredDevices.collect { devices ->
-                        updateDiscoveredDevices(devices)
-                    }
-                }
             }
         }
     }
 
-    private fun launchCommand(
+    private fun launchBleTask(block: suspend () -> Unit) {
+        lifecycleScope.launch { block() }
+    }
+
+    private suspend fun runCommand(
         command: String,
-        awaitResponse: Boolean,
+        awaitResponse: Boolean = true,
         timeoutMs: Long = 3_000L,
         retries: Int = 1,
-        onSuccess: ((String?) -> Unit)? = null
-    ) {
-        lifecycleScope.launch {
-            val result = bleManager.sendCommand(
-                command = command,
-                awaitResponse = awaitResponse,
-                timeoutMs = timeoutMs,
-                retries = retries
-            )
-            if (!result.success) {
-                appendLog("Command '${result.command}' failed: ${result.error ?: "unknown"}")
-                return@launch
-            }
-
-            if (awaitResponse) {
-                appendLog("Command '${result.command}' completed")
-            }
-            onSuccess?.invoke(result.response)
+        successLog: Boolean = awaitResponse
+    ): SaberBleManager.CommandResult {
+        val result = bleManager.sendCommand(
+            command = command,
+            awaitResponse = awaitResponse,
+            timeoutMs = timeoutMs,
+            retries = retries
+        )
+        if (!result.success) {
+            appendLog("Command '${result.command}' failed: ${result.error ?: "unknown"}")
+        } else if (successLog) {
+            appendLog("Command '${result.command}' completed")
         }
+        return result
     }
 
-    private fun setBladePower(isOn: Boolean) {
+    private suspend fun syncAllDataInternal() {
+        syncSaberPageInternal()
+        refreshTrackListInternal()
+        refreshNowPlayingInternal(logCompletion = false)
+    }
+
+    private suspend fun syncSaberPageInternal() {
+        refreshBladeStateInternal(logCompletion = false)
+        refreshPresetListInternal()
+        refreshCurrentPresetInternal(logCompletion = false)
+        refreshVolumeInternal(logCompletion = false)
+    }
+
+    private suspend fun refreshBladeStateInternal(logCompletion: Boolean = true) {
+        val result = runCommand(
+            command = "get_on",
+            awaitResponse = true,
+            successLog = logCompletion
+        )
+        if (!result.success) return
+
+        val parsedState = SaberCommandResponseParser.parseBladeState(result.response)
+        if (parsedState == null) {
+            appendLog("Unable to parse get_on response")
+            return
+        }
+
+        bladeState = parsedState
+        val currentPreset = currentPresetEntry()
+        saberStatus = when {
+            currentPreset?.isHeader == true -> {
+                "Header preset selected. Choose a blade preset to ignite."
+            }
+            parsedState -> "Blade reported ON"
+            else -> "Blade reported OFF"
+        }
+        renderAll()
+    }
+
+    private suspend fun refreshPresetListInternal() {
+        val result = runCommand(
+            command = "list_presets",
+            awaitResponse = true,
+            timeoutMs = 8_000L,
+            successLog = false
+        )
+        if (!result.success) return
+
+        presetEntries = SaberCommandResponseParser.parsePresetEntries(result.response)
+        presetRows = SaberCommandResponseParser.buildPresetRows(presetEntries)
+        saberStatus = if (presetEntries.isEmpty()) {
+            "No presets returned by saber"
+        } else {
+            "Loaded ${presetEntries.size} presets"
+        }
+        renderAll()
+    }
+
+    private suspend fun refreshCurrentPresetInternal(logCompletion: Boolean = true) {
+        val result = runCommand(
+            command = "get_preset",
+            awaitResponse = true,
+            successLog = logCompletion
+        )
+        if (!result.success) return
+
+        currentPresetIndex = SaberCommandResponseParser.parseCurrentPresetIndex(result.response)
+        val currentPreset = currentPresetEntry()
+        saberStatus = when {
+            currentPreset == null -> "Current preset index unavailable"
+            currentPreset.isHeader -> "Header preset selected. Choose a blade preset to ignite."
+            else -> "Preset ready: ${currentPreset.displayName}"
+        }
+        renderAll()
+    }
+
+    private suspend fun selectPresetInternal(entry: SaberCommandResponseParser.PresetEntry) {
+        if (entry.isHeader) {
+            saberStatus = "Header presets are not selectable from the app"
+            renderAll()
+            return
+        }
+
+        saberStatus = "Selecting preset ${entry.displayName}"
+        renderAll()
+        val result = runCommand(
+            command = "set_preset ${entry.index}",
+            awaitResponse = true,
+            timeoutMs = 5_000L,
+            successLog = false
+        )
+        if (!result.success) return
+
+        currentPresetIndex = entry.index
+        saberStatus = "Preset selected: ${entry.displayName}"
+        renderAll()
+        refreshCurrentPresetInternal(logCompletion = false)
+        refreshBladeStateInternal(logCompletion = false)
+        refreshNowPlayingInternal(logCompletion = false)
+    }
+
+    private suspend fun setBladePowerInternal(isOn: Boolean) {
+        if (isOn && currentPresetEntry()?.isHeader == true) {
+            saberStatus = "Header preset selected. Choose a blade preset to ignite."
+            renderAll()
+            return
+        }
+
+        saberStatus = if (isOn) "Ignition requested" else "Retraction requested"
+        renderAll()
         val command = if (isOn) "on" else "off"
-        launchCommand(command = command, awaitResponse = true) {
-            refreshBladeState()
-        }
+        val result = runCommand(command = command, awaitResponse = true)
+        if (!result.success) return
+        refreshBladeStateInternal(logCompletion = false)
     }
 
-    private fun refreshBladeState() {
-        launchCommand(command = "get_on", awaitResponse = true) { response ->
-            val bladeState = SaberCommandResponseParser.parseBladeState(response)
-            if (bladeState == null) {
-                appendLog("Unable to parse get_on response")
-            } else {
-                binding.textLastStateValue.text = if (bladeState) "ON (1)" else "OFF (0)"
-            }
-        }
+    private suspend fun refreshVolumeInternal(logCompletion: Boolean = true) {
+        val result = runCommand(
+            command = "get_volume",
+            awaitResponse = true,
+            successLog = logCompletion
+        )
+        if (!result.success) return
+
+        currentVolume = SaberCommandResponseParser.parseVolume(result.response)
+        renderAll()
     }
 
-    private fun refreshTrackList() {
-        launchCommand(
+    private suspend fun setVolumeInternal(volume: Int) {
+        val normalized = volume.coerceIn(0, 3000)
+        if (currentVolume == normalized) {
+            renderAll()
+            return
+        }
+
+        val result = runCommand(
+            command = "set_volume $normalized",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        currentVolume = normalized
+        saberStatus = "Volume set to $normalized"
+        trackStatus = "Volume set to $normalized"
+        renderAll()
+    }
+
+    private suspend fun refreshTrackListInternal() {
+        val result = runCommand(
             command = "list_tracks",
             awaitResponse = true,
-            timeoutMs = 6_000L
-        ) { response ->
-            val parsedTracks = SaberCommandResponseParser.parseTrackPaths(response)
-            updateTrackList(parsedTracks)
-            appendLog("Loaded ${parsedTracks.size} tracks")
+            timeoutMs = 8_000L,
+            successLog = false
+        )
+        if (!result.success) return
+
+        trackPaths = SaberCommandResponseParser.parseTrackPaths(result.response)
+        trackRows = SaberCommandResponseParser.buildTrackRows(trackPaths)
+        trackStatus = if (trackPaths.isEmpty()) {
+            "No tracks returned by saber"
+        } else {
+            "Loaded ${trackPaths.size} tracks"
         }
+        renderAll()
     }
 
-    private fun refreshNowPlaying() {
-        launchCommand(command = "get_track", awaitResponse = true) { response ->
-            updateNowPlaying(SaberCommandResponseParser.parseNowPlaying(response))
+    private suspend fun refreshNowPlayingInternal(logCompletion: Boolean = true) {
+        val result = runCommand(
+            command = "get_track",
+            awaitResponse = true,
+            successLog = logCompletion
+        )
+        if (!result.success) return
+
+        nowPlaying = SaberCommandResponseParser.parseNowPlaying(result.response)
+        trackStatus = if (nowPlaying == null) {
+            "Nothing playing"
+        } else {
+            "Playing ${displayTrackName(nowPlaying)}"
         }
+        renderAll()
     }
 
-    private fun playTrack(trackPath: String) {
-        launchCommand(
+    private suspend fun playTrackInternal(trackPath: String) {
+        trackStatus = "Play requested: ${displayTrackName(trackPath)}"
+        renderAll()
+        val result = runCommand(
             command = "play_track $trackPath",
             awaitResponse = true,
-            timeoutMs = 4_000L
-        ) { response ->
-            val nowPlaying = SaberCommandResponseParser.parseNowPlaying(response)
-            if (nowPlaying == null && !response.isNullOrBlank()) {
-                appendLog("Unable to confirm play_track response for $trackPath")
+            timeoutMs = 5_000L,
+            successLog = false
+        )
+        if (!result.success) return
+
+        val immediateNowPlaying = SaberCommandResponseParser.parseNowPlaying(result.response)
+        if (immediateNowPlaying != null) {
+            nowPlaying = immediateNowPlaying
+            trackStatus = "Playing ${displayTrackName(immediateNowPlaying)}"
+            renderAll()
+            return
+        }
+
+        appendLog("Unable to confirm play_track response for $trackPath")
+        val confirmation = runCommand(
+            command = "get_track",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (confirmation.success) {
+            nowPlaying = SaberCommandResponseParser.parseNowPlaying(confirmation.response)
+        }
+        trackStatus = if (nowPlaying == null) {
+            "Play not confirmed for ${displayTrackName(trackPath)}"
+        } else {
+            "Playing ${displayTrackName(nowPlaying)}"
+        }
+        renderAll()
+    }
+
+    private suspend fun stopTrackInternal() {
+        trackStatus = "Stop requested"
+        renderAll()
+        val result = runCommand(
+            command = "stop_track",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        val confirmation = runCommand(
+            command = "get_track",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (confirmation.success) {
+            nowPlaying = SaberCommandResponseParser.parseNowPlaying(confirmation.response)
+        }
+        trackStatus = if (nowPlaying == null) "Stopped" else "Still playing ${displayTrackName(nowPlaying)}"
+        renderAll()
+    }
+
+    private fun renderAll() {
+        saberPageBinding?.let { renderSaberPage(it) }
+        tracksPageBinding?.let { renderTracksPage(it) }
+    }
+
+    private fun renderSaberPage(pageBinding: PageSaberBinding) {
+        val currentPreset = currentPresetEntry()
+        pageBinding.textSaberStatusValue.text = when {
+            saberStatus.isNotBlank() -> saberStatus
+            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
+            currentPreset?.isHeader == true -> "Header preset selected. Choose a blade preset to ignite."
+            else -> "Ready"
+        }
+        pageBinding.textLastStateValue.text = when (bladeState) {
+            true -> "ON (1)"
+            false -> "OFF (0)"
+            null -> getString(R.string.state_unknown)
+        }
+        pageBinding.textCurrentPresetValue.text = currentPreset?.let { entry ->
+            if (entry.isHeader) {
+                "${entry.displayName} (header)"
             } else {
-                updateNowPlaying(nowPlaying ?: trackPath)
-                appendLog("Track selected: $trackPath")
+                entry.displayName
             }
+        } ?: getString(R.string.state_unknown)
+        pageBinding.textPresetCountValue.text = if (presetEntries.isEmpty()) {
+            getString(R.string.preset_count_empty)
+        } else {
+            "${presetEntries.size} presets"
         }
+
+        presetAdapter.items = presetRows
+        presetAdapter.selectedPosition = presetRows.indexOfFirst { row ->
+            row.presetIndex == currentPresetIndex
+        }
+
+        val canInteract = currentConnectionState == ConnectionState.READY
+        pageBinding.buttonOn.isEnabled = canInteract && currentPreset?.isHeader != true
+        pageBinding.buttonOff.isEnabled = canInteract
+        pageBinding.buttonSyncSaber.isEnabled = canInteract
+        pageBinding.listPresets.isEnabled = canInteract && presetRows.isNotEmpty()
+        pageBinding.buttonRefreshVolume.isEnabled = canInteract
+        pageBinding.seekVolume.isEnabled = canInteract
+        bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
     }
 
-    private fun stopTrack() {
-        launchCommand(command = "stop_track", awaitResponse = true) {
-            updateNowPlaying(null)
+    private fun renderTracksPage(pageBinding: PageTracksBinding) {
+        pageBinding.textTrackStatusValue.text = when {
+            trackStatus.isNotBlank() -> trackStatus
+            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
+            else -> "Ready"
         }
-    }
-
-    private fun updateTrackList(newTracks: List<String>) {
-        trackPaths.clear()
-        trackPaths.addAll(newTracks)
-        trackAdapter.notifyDataSetChanged()
-
-        binding.textTrackCountValue.text = if (newTracks.isEmpty()) {
+        pageBinding.textNowPlayingValue.text = nowPlaying ?: getString(R.string.state_none)
+        pageBinding.textTrackCountValue.text = if (trackPaths.isEmpty()) {
             getString(R.string.track_count_empty)
         } else {
-            "${newTracks.size} tracks"
+            "${trackPaths.size} tracks"
         }
 
-        if (newTracks.isEmpty()) {
-            binding.listTracks.clearChoices()
-            binding.listTracks.invalidateViews()
+        trackAdapter.items = trackRows
+        trackAdapter.selectedPosition = trackRows.indexOfFirst { row ->
+            row is SaberCommandResponseParser.TrackRow.Track && row.path == nowPlaying
         }
 
-        val ready = bleManager.connectionState.value == ConnectionState.READY
-        binding.listTracks.isEnabled = ready && newTracks.isNotEmpty()
-
-        val currentNowPlaying = binding.textNowPlayingValue.text
-            ?.toString()
-            ?.takeIf { it.isNotBlank() && it != getString(R.string.state_none) }
-        updateNowPlaying(currentNowPlaying)
+        val canInteract = currentConnectionState == ConnectionState.READY
+        pageBinding.buttonRefreshTracks.isEnabled = canInteract
+        pageBinding.buttonRefreshNowPlaying.isEnabled = canInteract
+        pageBinding.buttonStopTrack.isEnabled = canInteract
+        pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
+        pageBinding.buttonRefreshVolume.isEnabled = canInteract
+        pageBinding.seekVolume.isEnabled = canInteract
+        bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
     }
 
-    private fun updateDiscoveredDevices(devices: List<SaberBleManager.ScannedDevice>) {
-        discoveredDeviceAddresses.clear()
-        discoveredDeviceLabels.clear()
-
-        for (device in devices) {
-            discoveredDeviceAddresses.add(device.address)
-            discoveredDeviceLabels.add(buildDiscoveredDeviceLabel(device))
+    private fun bindVolume(textView: TextView, seekBar: SeekBar) {
+        val volume = currentVolume
+        suppressVolumeCallbacks = true
+        textView.text = volume?.toString() ?: getString(R.string.volume_unknown)
+        if (volume != null && seekBar.progress != volume) {
+            seekBar.progress = volume
         }
-        scanDeviceAdapter.notifyDataSetChanged()
-
-        binding.textNearbyDeviceCountValue.text = if (devices.isEmpty()) {
-            getString(R.string.nearby_device_count_empty)
-        } else {
-            "${devices.size} devices"
-        }
-
-        val state = bleManager.connectionState.value
-        binding.listDiscoveredDevices.isEnabled =
-            (state == ConnectionState.SCANNING || state == ConnectionState.DISCONNECTED) &&
-                devices.isNotEmpty()
-    }
-
-    private fun buildDiscoveredDeviceLabel(device: SaberBleManager.ScannedDevice): String {
-        val primaryName = device.deviceName
-            ?: device.scanRecordName
-            ?: getString(R.string.nearby_device_name_unknown)
-        val secondaryName = device.scanRecordName
-            ?.takeIf { it != device.deviceName }
-            ?.let { " scan=$it" }
-            .orEmpty()
-
-        return "$primaryName$secondaryName | ${device.address} | RSSI ${device.rssi}"
-    }
-
-    private fun updateNowPlaying(trackPath: String?) {
-        val normalizedTrack = trackPath?.takeIf { it.isNotBlank() }
-        binding.textNowPlayingValue.text = normalizedTrack ?: getString(R.string.state_none)
-
-        val selectedIndex = normalizedTrack?.let(trackPaths::indexOf) ?: -1
-        if (selectedIndex >= 0) {
-            binding.listTracks.setItemChecked(selectedIndex, true)
-        } else {
-            binding.listTracks.clearChoices()
-        }
-        binding.listTracks.invalidateViews()
-    }
-
-    private fun updateUiForConnectionState(state: ConnectionState) {
-        val ready = state == ConnectionState.READY
-        val disconnected = state == ConnectionState.DISCONNECTED
-
-        binding.buttonConnect.isEnabled = disconnected
-        binding.buttonDisconnect.isEnabled = !disconnected
-        binding.buttonOn.isEnabled = ready
-        binding.buttonOff.isEnabled = ready
-        binding.buttonGetState.isEnabled = ready
-        binding.buttonRefreshTracks.isEnabled = ready
-        binding.buttonRefreshNowPlaying.isEnabled = ready
-        binding.buttonStopTrack.isEnabled = ready
-        binding.listTracks.isEnabled = ready && trackPaths.isNotEmpty()
-        binding.listDiscoveredDevices.isEnabled =
-            (state == ConnectionState.SCANNING || state == ConnectionState.DISCONNECTED) &&
-                discoveredDeviceAddresses.isNotEmpty()
+        suppressVolumeCallbacks = false
     }
 
     private fun appendLog(line: String) {
@@ -372,5 +672,15 @@ class MainActivity : AppCompatActivity() {
         } else {
             listOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
+    }
+
+    private fun currentPresetEntry(): SaberCommandResponseParser.PresetEntry? {
+        val targetIndex = currentPresetIndex ?: return null
+        return presetEntries.firstOrNull { entry -> entry.index == targetIndex }
+    }
+
+    private fun displayTrackName(trackPath: String?): String {
+        if (trackPath.isNullOrBlank()) return getString(R.string.state_none)
+        return trackPath.substringAfterLast('/')
     }
 }

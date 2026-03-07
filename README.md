@@ -4,18 +4,23 @@ Android BLE controller app for ProffieOS-based saber control.
 
 ## Scope (Current Iteration)
 
-- Scan for BLE device named `FEASYCOM`
+- Use paired `FEASYCOM` first, then scan as fallback
 - Connect and discover GATT
 - Subscribe to notifications on `0xFFF1`
 - Write commands to `0xFFF2` with CRLF
 - Send `on`, `off`, and `get_on`
+- Fetch presets with `list_presets`
+- Read current preset with `get_preset`
+- Select presets with `set_preset <index>`
+- Read and set volume with `get_volume` / `set_volume <value>`
 - Fetch track paths with `list_tracks`
 - Start playback with `play_track <path>`
 - Stop playback with `stop_track`
 - Query now-playing with `get_track`
 - Parse framed output across fragmented BLE packets
-- Show connection/log/state in a simple UI
-- Show a path-based track list and tap-to-play flow
+- Show a two-tab UI with shared connection/log state
+- Show grouped preset headers using the `_sub_` naming convention
+- Show a grouped track list with tap-to-play flow
 
 ## BLE Protocol
 
@@ -31,6 +36,11 @@ Supported app commands:
 - `on`
 - `off`
 - `get_on`
+- `list_presets`
+- `get_preset`
+- `set_preset <index>`
+- `get_volume`
+- `set_volume <value>`
 - `list_tracks`
 - `play_track <path>`
 - `stop_track`
@@ -54,13 +64,20 @@ For local CLI builds, Android SDK path must also be configured via Android Studi
 
 ## Usage
 
-1. Tap `Connect` to scan for `FEASYCOM`.
-2. Wait for status `READY`.
-3. Tap `Refresh Tracks` to load available paths from the saber.
-4. Tap a track path in the list to send `play_track <path>`.
-5. Use `Stop Track` or `Now Playing` as needed.
-6. Tap `ON`, `OFF`, or `GET STATE` for blade control.
-7. Inspect the log panel for raw and framed responses.
+1. Tap `Connect`.
+2. The app will try the bonded `FEASYCOM` device first, then fall back to BLE scan.
+3. Wait for status `READY`. The app will automatically sync blade state, presets, tracks, and volume.
+4. On the `Saber` tab:
+   - use `ON` / `OFF`
+   - review the grouped preset list
+   - tap a non-header preset to select it
+   - use the volume refresh button or slider
+5. On the `Tracks` tab:
+   - tap `Refresh Tracks` to reload available paths
+   - tap a track row to send `play_track <path>`
+   - use `Now Playing` and `Stop Track` as needed
+   - use the volume refresh button or slider
+6. Inspect the shared log panel for `TX`, `RX`, and framed responses.
 
 ## Notes
 
@@ -68,11 +85,13 @@ For local CLI builds, Android SDK path must also be configured via Android Studi
 - The parser is resilient to notification packet fragmentation.
 - Command sending uses a serialized command lock with timeout/retry behavior for awaited responses.
 - Track browsing is currently path-based because the current firmware command surface is path-based.
+- Presets whose names start with `_sub_` are treated as non-selectable category headers in the UI.
+- If a header preset is currently selected, the app blocks ignition until a real preset is chosen.
 
 ## Troubleshooting
 
 - If status never reaches `READY`, verify the saber exposes characteristics `FFF1` and `FFF2`.
-- If no device is found, confirm advertising name is exactly `FEASYCOM`.
+- If no device is found in scan results but the phone is already paired, the app can still connect through the bonded `FEASYCOM` entry.
 - If command writes fail, disconnect and reconnect to re-discover services.
 - If pairing prompt appears, use PIN `000000`.
 - If `list_tracks` returns no items, verify the SD card contains `tracks/*.wav` or `*/tracks/*.wav`.

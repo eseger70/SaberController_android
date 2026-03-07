@@ -77,6 +77,8 @@ class SaberBleManager(
 
     private val commandMutex = Mutex()
     @Volatile private var pendingResponse: CompletableDeferred<String>? = null
+    @Volatile private var pendingWrite: CompletableDeferred<Int>? = null
+    @Volatile private var maxWritePayloadBytes: Int = DEFAULT_WRITE_PAYLOAD_BYTES
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState = _connectionState.asStateFlow()
@@ -107,9 +109,15 @@ class SaberBleManager(
                 BluetoothProfile.STATE_CONNECTED -> {
                     log("Connected to ${gatt.device.address}")
                     updateState(ConnectionState.DISCOVERING)
-                    if (!gatt.discoverServices()) {
-                        log("Failed to start service discovery")
-                        disconnect()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        if (gatt.requestMtu(REQUESTED_MTU)) {
+                            log("Requested MTU $REQUESTED_MTU")
+                        } else {
+                            log("MTU request not started; discovering services")
+                            discoverServices(gatt)
+                        }
+                    } else {
+                        discoverServices(gatt)
                     }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
@@ -150,6 +158,27 @@ class SaberBleManager(
                 } else {
                     log("Descriptor write failed: status=$status")
                 }
+            }
+        }
+
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                maxWritePayloadBytes = (mtu - 3).coerceAtLeast(DEFAULT_WRITE_PAYLOAD_BYTES)
+                log("MTU updated to $mtu (payload $maxWritePayloadBytes)")
+            } else {
+                maxWritePayloadBytes = DEFAULT_WRITE_PAYLOAD_BYTES
+                log("MTU change failed: status=$status")
+            }
+            discoverServices(gatt)
+        }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            if (characteristic.uuid == WRITE_UUID) {
+                pendingWrite?.complete(status)
             }
         }
 
@@ -437,6 +466,14 @@ class SaberBleManager(
         _discoveredDevices.value = emptyList()
     }
 
+    @SuppressLint("MissingPermission")
+    private fun discoverServices(gatt: BluetoothGatt) {
+        if (!gatt.discoverServices()) {
+            log("Failed to start service discovery")
+            disconnect()
+        }
+    }
+
     private fun normalizeName(name: String?): String? {
         return name
             ?.trim()
@@ -501,32 +538,69 @@ class SaberBleManager(
     }
 
     @SuppressLint("MissingPermission")
-    private fun writeCommand(payload: String): Boolean {
+    private suspend fun writeCommand(payload: String): Boolean {
         val gatt = bluetoothGatt ?: return false
         val characteristic = writeCharacteristic ?: return false
         val bytes = payload.toByteArray(StandardCharsets.UTF_8)
 
         characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val status = gatt.writeCharacteristic(
-                characteristic,
-                bytes,
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            )
-            status == BluetoothStatusCodes.SUCCESS
-        } else {
-            @Suppress("DEPRECATION")
-            run {
-                characteristic.value = bytes
-                gatt.writeCharacteristic(characteristic)
-            }
+        val chunkSize = maxWritePayloadBytes.coerceAtLeast(DEFAULT_WRITE_PAYLOAD_BYTES)
+        val chunks = bytes.asList().chunked(chunkSize).map { it.toByteArray() }
+        if (chunks.size > 1) {
+            log("Chunking write into ${chunks.size} parts for ${bytes.size} bytes")
         }
+
+        try {
+            for (chunk in chunks) {
+                val writeLatch = CompletableDeferred<Int>()
+                pendingWrite = writeLatch
+                val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val status = gatt.writeCharacteristic(
+                        characteristic,
+                        chunk,
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    )
+                    status == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    run {
+                        characteristic.value = chunk
+                        gatt.writeCharacteristic(characteristic)
+                    }
+                }
+                if (!started) {
+                    pendingWrite = null
+                    return false
+                }
+
+                val status = try {
+                    withTimeout(WRITE_CALLBACK_TIMEOUT_MS) {
+                        writeLatch.await()
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    pendingWrite = null
+                    log("Timed out waiting for write callback")
+                    return false
+                }
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    pendingWrite = null
+                    log("Characteristic write failed: status=$status")
+                    return false
+                }
+            }
+        } finally {
+            pendingWrite = null
+        }
+        return true
     }
 
     private fun resetGattState() {
         writeCharacteristic = null
         notifyCharacteristic = null
         bluetoothGatt = null
+        pendingWrite?.cancel()
+        pendingWrite = null
+        maxWritePayloadBytes = DEFAULT_WRITE_PAYLOAD_BYTES
         parser.clear()
     }
 
@@ -556,6 +630,9 @@ class SaberBleManager(
     }
 
     companion object {
+        private const val DEFAULT_WRITE_PAYLOAD_BYTES = 20
+        private const val REQUESTED_MTU = 247
+        private const val WRITE_CALLBACK_TIMEOUT_MS = 2_000L
         private val WRITE_UUID: UUID = UUID.fromString("0000fff2-0000-1000-8000-00805f9b34fb")
         private val NOTIFY_UUID: UUID = UUID.fromString("0000fff1-0000-1000-8000-00805f9b34fb")
         private val CCC_DESCRIPTOR_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")

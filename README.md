@@ -44,8 +44,11 @@ Supported app commands:
 3. Build and run on an Android device with BLE support.
 4. Grant Bluetooth permissions when prompted.
 
-If you want CLI builds later, generate wrapper files once from Android Studio
-or run `gradle wrapper` on a machine with Gradle installed.
+Wrapper files are now included, so CLI builds can use:
+- `.\gradlew.bat assembleDebug`
+- `.\gradlew.bat test`
+
+The first wrapper run will download Gradle automatically. A local JDK is still required.
 
 ## Usage
 

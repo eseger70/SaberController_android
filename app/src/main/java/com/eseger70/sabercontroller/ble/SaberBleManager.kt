@@ -380,8 +380,9 @@ class SaberBleManager(
     }
 
     private fun handleIncoming(value: ByteArray?) {
-        if (value.isNullOrEmpty()) return
-        val chunk = value.toString(StandardCharsets.UTF_8)
+        val bytes = value ?: return
+        if (bytes.isEmpty()) return
+        val chunk = bytes.toString(StandardCharsets.UTF_8)
         log("RX << ${escapeForLog(chunk)}")
 
         val frames = parser.consume(chunk)
@@ -458,4 +459,3 @@ class SaberBleManager(
         private val CCC_DESCRIPTOR_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }
-

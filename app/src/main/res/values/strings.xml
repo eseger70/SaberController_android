@@ -5,10 +5,16 @@
     <string name="on">ON</string>
     <string name="off">OFF</string>
     <string name="get_state">GET STATE</string>
+    <string name="refresh_tracks">Refresh Tracks</string>
+    <string name="refresh_now_playing">Now Playing</string>
+    <string name="stop_track">Stop Track</string>
     <string name="connection_state_label">Connection status</string>
     <string name="saber_state_label">Saber state</string>
+    <string name="now_playing_label">Now playing</string>
+    <string name="track_list_label">Track list</string>
     <string name="state_disconnected">DISCONNECTED</string>
     <string name="state_unknown">UNKNOWN</string>
+    <string name="state_none">NONE</string>
     <string name="log_label">Log</string>
+    <string name="track_count_empty">0 tracks</string>
 </resources>
-

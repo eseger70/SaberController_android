@@ -5,12 +5,15 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.eseger70.sabercontroller.ble.SaberBleManager.ConnectionState
+import com.eseger70.sabercontroller.ble.SaberCommandResponseParser
 import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
@@ -18,8 +21,10 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleManager: SaberBleManager
+    private lateinit var trackAdapter: ArrayAdapter<String>
 
     private val logLines = ArrayDeque<String>()
+    private val trackPaths = mutableListOf<String>()
     private var pendingPermissionAction: (() -> Unit)? = null
 
     private val permissionLauncher = registerForActivityResult(
@@ -43,8 +48,24 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bleManager = SaberBleManager(applicationContext)
+        trackAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_activated_1,
+            trackPaths
+        )
+        binding.listTracks.adapter = trackAdapter
+        binding.listTracks.setOnItemClickListener { _, _, position, _ ->
+            val trackPath = trackPaths.getOrNull(position) ?: return@setOnItemClickListener
+            runWithBlePermissions {
+                playTrack(trackPath)
+            }
+        }
+
         wireUi()
         collectBleState()
+        updateTrackList(emptyList())
+        updateNowPlaying(null)
+        updateUiForConnectionState(ConnectionState.DISCONNECTED)
 
         appendLog("Ready. Tap Connect to scan for FEASYCOM")
     }
@@ -69,19 +90,37 @@ class MainActivity : AppCompatActivity() {
 
         binding.buttonOn.setOnClickListener {
             runWithBlePermissions {
-                sendCommand(command = "on", awaitResponse = false)
+                setBladePower(isOn = true)
             }
         }
 
         binding.buttonOff.setOnClickListener {
             runWithBlePermissions {
-                sendCommand(command = "off", awaitResponse = false)
+                setBladePower(isOn = false)
             }
         }
 
         binding.buttonGetState.setOnClickListener {
             runWithBlePermissions {
-                sendCommand(command = "get_on", awaitResponse = true)
+                refreshBladeState()
+            }
+        }
+
+        binding.buttonRefreshTracks.setOnClickListener {
+            runWithBlePermissions {
+                refreshTrackList()
+            }
+        }
+
+        binding.buttonRefreshNowPlaying.setOnClickListener {
+            runWithBlePermissions {
+                refreshNowPlaying()
+            }
+        }
+
+        binding.buttonStopTrack.setOnClickListener {
+            runWithBlePermissions {
+                stopTrack()
             }
         }
     }
@@ -92,6 +131,7 @@ class MainActivity : AppCompatActivity() {
                 launch {
                     bleManager.connectionState.collect { state ->
                         binding.textConnectionStateValue.text = state.name
+                        updateUiForConnectionState(state)
                     }
                 }
                 launch {
@@ -99,22 +139,23 @@ class MainActivity : AppCompatActivity() {
                         appendLog(line)
                     }
                 }
-                launch {
-                    bleManager.frames.collect { frame ->
-                        updateStateValueFromFrame(frame)
-                    }
-                }
             }
         }
     }
 
-    private fun sendCommand(command: String, awaitResponse: Boolean) {
+    private fun launchCommand(
+        command: String,
+        awaitResponse: Boolean,
+        timeoutMs: Long = 3_000L,
+        retries: Int = 1,
+        onSuccess: ((String?) -> Unit)? = null
+    ) {
         lifecycleScope.launch {
             val result = bleManager.sendCommand(
                 command = command,
                 awaitResponse = awaitResponse,
-                timeoutMs = 3_000L,
-                retries = 1
+                timeoutMs = timeoutMs,
+                retries = retries
             )
             if (!result.success) {
                 appendLog("Command '${result.command}' failed: ${result.error ?: "unknown"}")
@@ -122,23 +163,121 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (awaitResponse) {
-                appendLog("Command '${result.command}' response received")
-                if (!result.response.isNullOrBlank()) {
-                    updateStateValueFromFrame(result.response)
-                }
+                appendLog("Command '${result.command}' completed")
+            }
+            onSuccess?.invoke(result.response)
+        }
+    }
+
+    private fun setBladePower(isOn: Boolean) {
+        val command = if (isOn) "on" else "off"
+        launchCommand(command = command, awaitResponse = true) {
+            refreshBladeState()
+        }
+    }
+
+    private fun refreshBladeState() {
+        launchCommand(command = "get_on", awaitResponse = true) { response ->
+            val bladeState = SaberCommandResponseParser.parseBladeState(response)
+            if (bladeState == null) {
+                appendLog("Unable to parse get_on response")
+            } else {
+                binding.textLastStateValue.text = if (bladeState) "ON (1)" else "OFF (0)"
             }
         }
     }
 
-    private fun updateStateValueFromFrame(frame: String) {
-        val line = frame
-            .lineSequence()
-            .map { it.trim() }
-            .firstOrNull { it == "0" || it == "1" }
-
-        if (line != null) {
-            binding.textLastStateValue.text = if (line == "1") "ON (1)" else "OFF (0)"
+    private fun refreshTrackList() {
+        launchCommand(
+            command = "list_tracks",
+            awaitResponse = true,
+            timeoutMs = 6_000L
+        ) { response ->
+            val parsedTracks = SaberCommandResponseParser.parseTrackPaths(response)
+            updateTrackList(parsedTracks)
+            appendLog("Loaded ${parsedTracks.size} tracks")
         }
+    }
+
+    private fun refreshNowPlaying() {
+        launchCommand(command = "get_track", awaitResponse = true) { response ->
+            updateNowPlaying(SaberCommandResponseParser.parseNowPlaying(response))
+        }
+    }
+
+    private fun playTrack(trackPath: String) {
+        launchCommand(
+            command = "play_track $trackPath",
+            awaitResponse = true,
+            timeoutMs = 4_000L
+        ) { response ->
+            val nowPlaying = SaberCommandResponseParser.parseNowPlaying(response)
+            if (nowPlaying == null && !response.isNullOrBlank()) {
+                appendLog("Unable to confirm play_track response for $trackPath")
+            } else {
+                updateNowPlaying(nowPlaying ?: trackPath)
+                appendLog("Track selected: $trackPath")
+            }
+        }
+    }
+
+    private fun stopTrack() {
+        launchCommand(command = "stop_track", awaitResponse = true) {
+            updateNowPlaying(null)
+        }
+    }
+
+    private fun updateTrackList(newTracks: List<String>) {
+        trackPaths.clear()
+        trackPaths.addAll(newTracks)
+        trackAdapter.notifyDataSetChanged()
+
+        binding.textTrackCountValue.text = if (newTracks.isEmpty()) {
+            getString(R.string.track_count_empty)
+        } else {
+            "${newTracks.size} tracks"
+        }
+
+        if (newTracks.isEmpty()) {
+            binding.listTracks.clearChoices()
+            binding.listTracks.invalidateViews()
+        }
+
+        val ready = bleManager.connectionState.value == ConnectionState.READY
+        binding.listTracks.isEnabled = ready && newTracks.isNotEmpty()
+
+        val currentNowPlaying = binding.textNowPlayingValue.text
+            ?.toString()
+            ?.takeIf { it.isNotBlank() && it != getString(R.string.state_none) }
+        updateNowPlaying(currentNowPlaying)
+    }
+
+    private fun updateNowPlaying(trackPath: String?) {
+        val normalizedTrack = trackPath?.takeIf { it.isNotBlank() }
+        binding.textNowPlayingValue.text = normalizedTrack ?: getString(R.string.state_none)
+
+        val selectedIndex = normalizedTrack?.let(trackPaths::indexOf) ?: -1
+        if (selectedIndex >= 0) {
+            binding.listTracks.setItemChecked(selectedIndex, true)
+        } else {
+            binding.listTracks.clearChoices()
+        }
+        binding.listTracks.invalidateViews()
+    }
+
+    private fun updateUiForConnectionState(state: ConnectionState) {
+        val ready = state == ConnectionState.READY
+        val disconnected = state == ConnectionState.DISCONNECTED
+
+        binding.buttonConnect.isEnabled = disconnected
+        binding.buttonDisconnect.isEnabled = !disconnected
+        binding.buttonOn.isEnabled = ready
+        binding.buttonOff.isEnabled = ready
+        binding.buttonGetState.isEnabled = ready
+        binding.buttonRefreshTracks.isEnabled = ready
+        binding.buttonRefreshNowPlaying.isEnabled = ready
+        binding.buttonStopTrack.isEnabled = ready
+        binding.listTracks.isEnabled = ready && trackPaths.isNotEmpty()
     }
 
     private fun appendLog(line: String) {
@@ -177,4 +316,3 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
-

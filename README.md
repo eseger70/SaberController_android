@@ -49,6 +49,7 @@ Wrapper files are now included, so CLI builds can use:
 - `.\gradlew.bat test`
 
 The first wrapper run will download Gradle automatically. A local JDK is still required.
+GitHub Actions CI is also configured to run unit tests and build a debug APK on pushes and pull requests.
 
 ## Usage
 

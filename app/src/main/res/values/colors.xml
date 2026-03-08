@@ -1,4 +1,22 @@
 <resources>
-    <color name="seed">#1E5A80</color>
+    <color name="seed">#124559</color>
+    <color name="app_primary">#124559</color>
+    <color name="app_on_primary">#F8FBFC</color>
+    <color name="app_secondary">#8C5E34</color>
+    <color name="app_on_secondary">#FFF8F2</color>
+    <color name="app_background_top">#F7F2E8</color>
+    <color name="app_background_bottom">#DDECF2</color>
+    <color name="app_surface">#FFFDF7</color>
+    <color name="app_surface_alt">#EEF5F7</color>
+    <color name="app_outline">#B7C5CB</color>
+    <color name="app_text_primary">#13262F</color>
+    <color name="app_text_secondary">#5D6E76</color>
+    <color name="app_on_color">#2E7D4F</color>
+    <color name="app_off_color">#B85C38</color>
+    <color name="app_log_background">#132832</color>
+    <color name="app_log_line">#24414D</color>
+    <color name="app_log_text">#DCEAF0</color>
+    <color name="app_selected_row">#D9EAF2</color>
+    <color name="app_header_row">#E9F1F4</color>
+    <color name="app_header_text">#365A6B</color>
 </resources>
-

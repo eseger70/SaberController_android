@@ -1,6 +1,9 @@
 package com.eseger70.sabercontroller
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -8,6 +11,7 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -31,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pagerAdapter: MainPagerAdapter
 
     private val logLines = ArrayDeque<String>()
+    private var lastFrameLine: String? = null
     private var pendingPermissionAction: (() -> Unit)? = null
     private var currentConnectionState: ConnectionState = ConnectionState.DISCONNECTED
     private var suppressVolumeCallbacks = false
@@ -132,6 +137,19 @@ class MainActivity : AppCompatActivity() {
         binding.buttonDisconnect.setOnClickListener {
             runWithBlePermissions {
                 bleManager.disconnect()
+            }
+        }
+
+        binding.buttonCopyLog.setOnClickListener {
+            copyTextToClipboard(buildLogText(), getString(R.string.log_copied))
+        }
+
+        binding.buttonCopyLastFrame.setOnClickListener {
+            val frame = lastFrameLine
+            if (frame.isNullOrBlank()) {
+                showToast(getString(R.string.no_frame_captured))
+            } else {
+                copyTextToClipboard(frame, getString(R.string.last_frame_copied))
             }
         }
     }
@@ -643,11 +661,26 @@ class MainActivity : AppCompatActivity() {
         if (logLines.size >= maxLines) {
             logLines.removeFirst()
         }
+        if (line.startsWith("FRAME<<")) {
+            lastFrameLine = line
+        }
         logLines.addLast(line)
-        binding.textLog.text = logLines.joinToString(separator = "\n")
+        binding.textLog.text = buildLogText()
         binding.scrollLog.post {
             binding.scrollLog.fullScroll(View.FOCUS_DOWN)
         }
+    }
+
+    private fun buildLogText(): String = logLines.joinToString(separator = "\n")
+
+    private fun copyTextToClipboard(text: String, message: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), text))
+        showToast(message)
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun runWithBlePermissions(action: () -> Unit) {

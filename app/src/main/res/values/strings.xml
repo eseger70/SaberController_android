@@ -29,5 +29,10 @@
     <string name="state_unknown">UNKNOWN</string>
     <string name="state_none">NONE</string>
     <string name="log_label">Log</string>
+    <string name="copy_log">Copy Log</string>
+    <string name="copy_last_frame">Copy Last Frame</string>
+    <string name="log_copied">Log copied to clipboard</string>
+    <string name="last_frame_copied">Last frame copied to clipboard</string>
+    <string name="no_frame_captured">No frame captured yet</string>
     <string name="track_count_empty">0 tracks</string>
 </resources>

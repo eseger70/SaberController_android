@@ -105,6 +105,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/on"
+                    android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_on_color"
                     app:cornerRadius="18dp" />
 
@@ -116,6 +117,7 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:text="@string/off"
+                    android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_off_color"
                     app:cornerRadius="18dp" />
 
@@ -127,6 +129,7 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:text="@string/sync_saber"
+                    android:textColor="@color/app_text_primary"
                     app:cornerRadius="18dp"
                     app:strokeColor="@color/app_outline" />
             </LinearLayout>
@@ -225,6 +228,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/refresh_volume"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
                     app:cornerRadius="16dp" />
             </LinearLayout>
 

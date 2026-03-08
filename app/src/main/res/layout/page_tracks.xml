@@ -68,6 +68,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/refresh_tracks"
+                    android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_primary"
                     app:cornerRadius="18dp" />
 
@@ -79,6 +80,8 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:text="@string/refresh_now_playing"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
                     app:cornerRadius="18dp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -89,6 +92,7 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:text="@string/stop_track"
+                    android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_off_color"
                     app:cornerRadius="18dp" />
             </LinearLayout>
@@ -188,6 +192,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/refresh_volume"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
                     app:cornerRadius="16dp" />
             </LinearLayout>
 

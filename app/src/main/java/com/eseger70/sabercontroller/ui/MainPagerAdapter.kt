@@ -3,15 +3,17 @@ package com.eseger70.sabercontroller.ui
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.eseger70.sabercontroller.databinding.PageLogBinding
 import com.eseger70.sabercontroller.databinding.PageSaberBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
 
 class MainPagerAdapter(
     private val onSaberPageBound: (PageSaberBinding) -> Unit,
-    private val onTracksPageBound: (PageTracksBinding) -> Unit
+    private val onTracksPageBound: (PageTracksBinding) -> Unit,
+    private val onLogPageBound: (PageLogBinding) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    override fun getItemCount(): Int = 2
+    override fun getItemCount(): Int = 3
 
     override fun getItemViewType(position: Int): Int = position
 
@@ -22,8 +24,12 @@ class MainPagerAdapter(
                 PageSaberBinding.inflate(inflater, parent, false)
             )
 
-            else -> TracksPageViewHolder(
+            VIEW_TYPE_TRACKS -> TracksPageViewHolder(
                 PageTracksBinding.inflate(inflater, parent, false)
+            )
+
+            else -> LogPageViewHolder(
+                PageLogBinding.inflate(inflater, parent, false)
             )
         }
     }
@@ -32,6 +38,7 @@ class MainPagerAdapter(
         when (holder) {
             is SaberPageViewHolder -> onSaberPageBound(holder.binding)
             is TracksPageViewHolder -> onTracksPageBound(holder.binding)
+            is LogPageViewHolder -> onLogPageBound(holder.binding)
         }
     }
 
@@ -43,7 +50,12 @@ class MainPagerAdapter(
         val binding: PageTracksBinding
     ) : RecyclerView.ViewHolder(binding.root)
 
+    private class LogPageViewHolder(
+        val binding: PageLogBinding
+    ) : RecyclerView.ViewHolder(binding.root)
+
     companion object {
         private const val VIEW_TYPE_SABER = 0
+        private const val VIEW_TYPE_TRACKS = 1
     }
 }

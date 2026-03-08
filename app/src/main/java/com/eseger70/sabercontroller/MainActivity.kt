@@ -22,6 +22,7 @@ import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.ble.SaberBleManager.ConnectionState
 import com.eseger70.sabercontroller.ble.SaberCommandResponseParser
 import com.eseger70.sabercontroller.databinding.ActivityMainBinding
+import com.eseger70.sabercontroller.databinding.PageLogBinding
 import com.eseger70.sabercontroller.databinding.PageSaberBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
 import com.eseger70.sabercontroller.ui.MainPagerAdapter
@@ -42,6 +43,7 @@ class MainActivity : AppCompatActivity() {
 
     private var saberPageBinding: PageSaberBinding? = null
     private var tracksPageBinding: PageTracksBinding? = null
+    private var logPageBinding: PageLogBinding? = null
 
     private val presetAdapter by lazy {
         SectionedListAdapter<SaberCommandResponseParser.PresetRow>(
@@ -113,16 +115,17 @@ class MainActivity : AppCompatActivity() {
     private fun setupPager() {
         pagerAdapter = MainPagerAdapter(
             onSaberPageBound = { pageBinding -> bindSaberPage(pageBinding) },
-            onTracksPageBound = { pageBinding -> bindTracksPage(pageBinding) }
+            onTracksPageBound = { pageBinding -> bindTracksPage(pageBinding) },
+            onLogPageBound = { pageBinding -> bindLogPage(pageBinding) }
         )
         binding.viewPager.adapter = pagerAdapter
-        binding.viewPager.offscreenPageLimit = 1
+        binding.viewPager.offscreenPageLimit = 3
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
-            tab.text = if (position == 0) {
-                getString(R.string.tab_saber)
-            } else {
-                getString(R.string.tab_tracks)
+            tab.text = when (position) {
+                0 -> getString(R.string.tab_saber)
+                1 -> getString(R.string.tab_tracks)
+                else -> getString(R.string.tab_log)
             }
         }.attach()
     }
@@ -137,19 +140,6 @@ class MainActivity : AppCompatActivity() {
         binding.buttonDisconnect.setOnClickListener {
             runWithBlePermissions {
                 bleManager.disconnect()
-            }
-        }
-
-        binding.buttonCopyLog.setOnClickListener {
-            copyTextToClipboard(buildLogText(), getString(R.string.log_copied))
-        }
-
-        binding.buttonCopyLastFrame.setOnClickListener {
-            val frame = lastFrameLine
-            if (frame.isNullOrBlank()) {
-                showToast(getString(R.string.no_frame_captured))
-            } else {
-                copyTextToClipboard(frame, getString(R.string.last_frame_copied))
             }
         }
     }
@@ -260,6 +250,25 @@ class MainActivity : AppCompatActivity() {
         })
 
         renderTracksPage(pageBinding)
+    }
+
+    private fun bindLogPage(pageBinding: PageLogBinding) {
+        logPageBinding = pageBinding
+
+        pageBinding.buttonCopyLog.setOnClickListener {
+            copyTextToClipboard(buildLogText(), getString(R.string.log_copied))
+        }
+
+        pageBinding.buttonCopyLastFrame.setOnClickListener {
+            val frame = lastFrameLine
+            if (frame.isNullOrBlank()) {
+                showToast(getString(R.string.no_frame_captured))
+            } else {
+                copyTextToClipboard(frame, getString(R.string.last_frame_copied))
+            }
+        }
+
+        renderLogPage(pageBinding)
     }
 
     private fun collectBleState() {
@@ -581,6 +590,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderAll() {
         saberPageBinding?.let { renderSaberPage(it) }
         tracksPageBinding?.let { renderTracksPage(it) }
+        logPageBinding?.let { renderLogPage(it) }
     }
 
     private fun renderSaberPage(pageBinding: PageSaberBinding) {
@@ -662,6 +672,13 @@ class MainActivity : AppCompatActivity() {
         suppressVolumeCallbacks = false
     }
 
+    private fun renderLogPage(pageBinding: PageLogBinding) {
+        pageBinding.textLog.text = buildLogText()
+        pageBinding.scrollLog.post {
+            pageBinding.scrollLog.fullScroll(View.FOCUS_DOWN)
+        }
+    }
+
     private fun appendLog(line: String) {
         val maxLines = 350
         if (logLines.size >= maxLines) {
@@ -671,10 +688,7 @@ class MainActivity : AppCompatActivity() {
             lastFrameLine = line
         }
         logLines.addLast(line)
-        binding.textLog.text = buildLogText()
-        binding.scrollLog.post {
-            binding.scrollLog.fullScroll(View.FOCUS_DOWN)
-        }
+        logPageBinding?.let { renderLogPage(it) }
     }
 
     private fun buildLogText(): String = logLines.joinToString(separator = "\n")

@@ -12,6 +12,7 @@
     <string name="stop_track">Stop Track</string>
     <string name="tab_saber">Saber</string>
     <string name="tab_tracks">Tracks</string>
+    <string name="tab_log">Log</string>
     <string name="connection_state_label">Connection status</string>
     <string name="nearby_devices_label">Nearby BLE devices</string>
     <string name="nearby_device_count_empty">0 devices</string>
@@ -29,6 +30,7 @@
     <string name="state_unknown">UNKNOWN</string>
     <string name="state_none">NONE</string>
     <string name="log_label">Log</string>
+    <string name="log_hint">Long-press the log to select text.</string>
     <string name="copy_log">Copy Log</string>
     <string name="copy_last_frame">Copy Last Frame</string>
     <string name="log_copied">Log copied to clipboard</string>

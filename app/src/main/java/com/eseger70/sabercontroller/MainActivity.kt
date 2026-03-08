@@ -28,6 +28,7 @@ import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.ble.SaberBleManager.ConnectionState
 import com.eseger70.sabercontroller.ble.SaberCommandResponseParser
 import com.eseger70.sabercontroller.databinding.ActivityMainBinding
+import com.eseger70.sabercontroller.databinding.PageEffectsBinding
 import com.eseger70.sabercontroller.databinding.PageLogBinding
 import com.eseger70.sabercontroller.databinding.PageSaberBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
@@ -50,6 +51,7 @@ class MainActivity : AppCompatActivity() {
 
     private var saberPageBinding: PageSaberBinding? = null
     private var tracksPageBinding: PageTracksBinding? = null
+    private var effectsPageBinding: PageEffectsBinding? = null
     private var logPageBinding: PageLogBinding? = null
 
     private val presetAdapter by lazy {
@@ -77,6 +79,7 @@ class MainActivity : AppCompatActivity() {
     private var bladeState: Boolean? = null
     private var saberStatus: String = ""
     private var trackStatus: String = ""
+    private var effectsStatus: String = ""
     private var nowPlaying: String? = null
     private var currentPresetIndex: Int? = null
     private var currentVolume: Int? = null
@@ -124,15 +127,17 @@ class MainActivity : AppCompatActivity() {
         pagerAdapter = MainPagerAdapter(
             onSaberPageBound = { pageBinding -> bindSaberPage(pageBinding) },
             onTracksPageBound = { pageBinding -> bindTracksPage(pageBinding) },
+            onEffectsPageBound = { pageBinding -> bindEffectsPage(pageBinding) },
             onLogPageBound = { pageBinding -> bindLogPage(pageBinding) }
         )
         binding.viewPager.adapter = pagerAdapter
-        binding.viewPager.offscreenPageLimit = 3
+        binding.viewPager.offscreenPageLimit = 4
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> getString(R.string.tab_saber)
                 1 -> getString(R.string.tab_tracks)
+                2 -> getString(R.string.tab_effects)
                 else -> getString(R.string.tab_log)
             }
         }.attach()
@@ -179,6 +184,7 @@ class MainActivity : AppCompatActivity() {
         val titles = listOf(
             R.string.tab_saber,
             R.string.tab_tracks,
+            R.string.tab_effects,
             R.string.tab_log
         )
 
@@ -200,9 +206,9 @@ class MainActivity : AppCompatActivity() {
         return TextView(this).apply {
             text = title
             gravity = Gravity.CENTER
-            minWidth = dp(84)
-            setPadding(dp(18), dp(10), dp(18), dp(10))
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            minWidth = dp(72)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14f)
             typeface = Typeface.DEFAULT_BOLD
         }
     }
@@ -353,6 +359,21 @@ class MainActivity : AppCompatActivity() {
         renderLogPage(pageBinding)
     }
 
+    private fun bindEffectsPage(pageBinding: PageEffectsBinding) {
+        effectsPageBinding = pageBinding
+
+        pageBinding.buttonClash.setOnClickListener { triggerEffect("clash", "Clash triggered") }
+        pageBinding.buttonStab.setOnClickListener { triggerEffect("stab", "Stab triggered") }
+        pageBinding.buttonForce.setOnClickListener { triggerEffect("force", "Force effect triggered") }
+        pageBinding.buttonBlast.setOnClickListener { triggerEffect("blast", "Blast triggered") }
+        pageBinding.buttonLockup.setOnClickListener { triggerEffect("lockup", "Lockup toggled") }
+        pageBinding.buttonDrag.setOnClickListener { triggerEffect("drag", "Drag toggled") }
+        pageBinding.buttonLightningBlock.setOnClickListener { triggerEffect("lblock", "Lightning block toggled") }
+        pageBinding.buttonMelt.setOnClickListener { triggerEffect("melt", "Melt toggled") }
+
+        renderEffectsPage(pageBinding)
+    }
+
     private fun collectBleState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -368,6 +389,7 @@ class MainActivity : AppCompatActivity() {
                         if (state == ConnectionState.READY && previous != ConnectionState.READY) {
                             saberStatus = "Connected. Syncing saber data..."
                             trackStatus = "Connected. Syncing track data..."
+                            effectsStatus = ""
                             renderAll()
                             launchBleTask { syncAllDataInternal() }
                         }
@@ -383,6 +405,7 @@ class MainActivity : AppCompatActivity() {
                             trackRows = emptyList()
                             saberStatus = "Disconnected"
                             trackStatus = "Disconnected"
+                            effectsStatus = ""
                             renderAll()
                         }
                     }
@@ -669,9 +692,48 @@ class MainActivity : AppCompatActivity() {
         renderAll()
     }
 
+    private fun triggerEffect(command: String, fallbackMessage: String) {
+        runWithBlePermissions {
+            launchBleTask { triggerEffectInternal(command, fallbackMessage) }
+        }
+    }
+
+    private suspend fun triggerEffectInternal(command: String, fallbackMessage: String) {
+        val currentPreset = currentPresetEntry()
+        if (currentPreset == null) {
+            effectsStatus = "Current preset unavailable."
+            renderAll()
+            return
+        }
+        if (currentPreset.isHeader) {
+            effectsStatus = "Header preset selected. Choose a blade preset."
+            renderAll()
+            return
+        }
+        if (bladeState != true) {
+            effectsStatus = "Turn blade on to use blade effects."
+            renderAll()
+            return
+        }
+
+        effectsStatus = "$fallbackMessage..."
+        renderAll()
+
+        val result = runCommand(
+            command = command,
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        effectsStatus = firstResponseLine(result.response) ?: fallbackMessage
+        renderAll()
+    }
+
     private fun renderAll() {
         saberPageBinding?.let { renderSaberPage(it) }
         tracksPageBinding?.let { renderTracksPage(it) }
+        effectsPageBinding?.let { renderEffectsPage(it) }
         logPageBinding?.let { renderLogPage(it) }
     }
 
@@ -744,6 +806,39 @@ class MainActivity : AppCompatActivity() {
         bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
     }
 
+    private fun renderEffectsPage(pageBinding: PageEffectsBinding) {
+        val currentPreset = currentPresetEntry()
+        pageBinding.textEffectsStatusValue.text = when {
+            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
+            currentPreset == null -> "Current preset unavailable."
+            currentPreset?.isHeader == true -> "Header preset selected. Choose a blade preset."
+            bladeState != true -> "Turn blade on to use blade effects."
+            effectsStatus.isNotBlank() -> effectsStatus
+            else -> "Ready for blade effects"
+        }
+        val presetName = currentPreset?.displayName ?: getString(R.string.state_unknown)
+        val bladeText = when (bladeState) {
+            true -> "Blade ON"
+            false -> "Blade OFF"
+            null -> "Blade UNKNOWN"
+        }
+        pageBinding.textEffectsContextValue.text = "$bladeText | Preset $presetName"
+
+        val canUseEffects = currentConnectionState == ConnectionState.READY &&
+            bladeState == true &&
+            currentPreset != null &&
+            currentPreset?.isHeader != true
+
+        pageBinding.buttonClash.isEnabled = canUseEffects
+        pageBinding.buttonStab.isEnabled = canUseEffects
+        pageBinding.buttonForce.isEnabled = canUseEffects
+        pageBinding.buttonBlast.isEnabled = canUseEffects
+        pageBinding.buttonLockup.isEnabled = canUseEffects
+        pageBinding.buttonDrag.isEnabled = canUseEffects
+        pageBinding.buttonLightningBlock.isEnabled = canUseEffects
+        pageBinding.buttonMelt.isEnabled = canUseEffects
+    }
+
     private fun bindVolume(textView: TextView, seekBar: SeekBar) {
         val volume = currentVolume?.coerceIn(0, MAX_VOLUME)
         suppressVolumeCallbacks = true
@@ -774,6 +869,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildLogText(): String = logLines.joinToString(separator = "\n")
+
+    private fun firstResponseLine(response: String?): String? {
+        return response
+            ?.lineSequence()
+            ?.map { it.trim() }
+            ?.firstOrNull { it.isNotEmpty() }
+    }
 
     private fun copyTextToClipboard(text: String, message: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

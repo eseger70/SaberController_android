@@ -12,6 +12,7 @@
     <string name="stop_track">Stop Track</string>
     <string name="tab_saber">Saber</string>
     <string name="tab_tracks">Tracks</string>
+    <string name="tab_effects">Effects</string>
     <string name="tab_log">Log</string>
     <string name="connection_state_label">Connection status</string>
     <string name="nearby_devices_label">Nearby BLE devices</string>
@@ -22,6 +23,7 @@
     <string name="current_preset_label">Current preset</string>
     <string name="preset_count_empty">0 presets</string>
     <string name="track_status_label">Track status</string>
+    <string name="effects_status_label">Effects status</string>
     <string name="now_playing_label">Now playing</string>
     <string name="track_list_label">Track list</string>
     <string name="volume_label">Volume</string>
@@ -31,6 +33,18 @@
     <string name="state_none">NONE</string>
     <string name="log_label">Log</string>
     <string name="log_hint">Long-press the log to select text.</string>
+    <string name="effects_context_placeholder">Blade OFF | Preset UNKNOWN</string>
+    <string name="effects_hint">Clash, stab, force, and blast fire once. Lockup, drag, lightning block, and melt toggle on and off.</string>
+    <string name="instant_effects_label">Instant effects</string>
+    <string name="sustained_effects_label">Toggle effects</string>
+    <string name="effect_clash">Clash</string>
+    <string name="effect_stab">Stab</string>
+    <string name="effect_force">Force</string>
+    <string name="effect_blast">Blast</string>
+    <string name="effect_lockup">Lockup</string>
+    <string name="effect_drag">Drag</string>
+    <string name="effect_lightning_block">Lightning Block</string>
+    <string name="effect_melt">Melt</string>
     <string name="copy_log">Copy Log</string>
     <string name="copy_last_frame">Copy Last Frame</string>
     <string name="log_copied">Log copied to clipboard</string>

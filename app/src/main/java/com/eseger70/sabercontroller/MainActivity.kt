@@ -27,7 +27,6 @@ import com.eseger70.sabercontroller.databinding.PageTracksBinding
 import com.eseger70.sabercontroller.ui.MainPagerAdapter
 import com.eseger70.sabercontroller.ui.SectionedListAdapter
 import com.google.android.material.tabs.TabLayoutMediator
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -40,7 +39,6 @@ class MainActivity : AppCompatActivity() {
     private var pendingPermissionAction: (() -> Unit)? = null
     private var currentConnectionState: ConnectionState = ConnectionState.DISCONNECTED
     private var suppressVolumeCallbacks = false
-    private var trackSelectionLocked = false
 
     private var saberPageBinding: PageSaberBinding? = null
     private var tracksPageBinding: PageTracksBinding? = null
@@ -517,12 +515,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun playTrackInternal(trackPath: String) {
-        if (trackSelectionLocked) {
-            trackStatus = "Track selection cooling down. Wait for the current request to settle."
-            renderAll()
-            return
-        }
-        lockTrackSelection()
         trackStatus = "Play requested: ${displayTrackName(trackPath)}"
         renderAll()
         val trackIndex = trackPaths.indexOf(trackPath)
@@ -654,20 +646,10 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonRefreshTracks.isEnabled = canInteract
         pageBinding.buttonRefreshNowPlaying.isEnabled = canInteract
         pageBinding.buttonStopTrack.isEnabled = canInteract
-        pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty() && !trackSelectionLocked
+        pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
         pageBinding.buttonRefreshVolume.isEnabled = canInteract
         pageBinding.seekVolume.isEnabled = canInteract
         bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
-    }
-
-    private fun lockTrackSelection(durationMs: Long = 2_500L) {
-        trackSelectionLocked = true
-        renderAll()
-        lifecycleScope.launch {
-            delay(durationMs)
-            trackSelectionLocked = false
-            renderAll()
-        }
     }
 
     private fun bindVolume(textView: TextView, seekBar: SeekBar) {

@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_app_shell"
+    android:clipToPadding="false"
     android:orientation="vertical"
     android:padding="16dp">
 
@@ -85,7 +86,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="14dp"
-        app:cardBackgroundColor="@color/app_surface"
+        app:cardBackgroundColor="@color/app_surface_alt"
         app:cardCornerRadius="22dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/app_outline"
@@ -95,8 +96,10 @@
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@color/app_surface_alt"
+            android:padding="6dp"
             app:tabIndicatorAnimationMode="elastic"
-            app:tabIndicatorColor="@color/app_primary"
+            app:tabIndicatorColor="@android:color/transparent"
             app:tabIndicatorFullWidth="false"
             app:tabMode="fixed"
             app:tabRippleColor="@android:color/transparent"

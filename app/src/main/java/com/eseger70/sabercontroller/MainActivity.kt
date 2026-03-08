@@ -5,8 +5,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.widget.AdapterView
 import android.widget.SeekBar
@@ -14,7 +16,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -27,6 +33,7 @@ import com.eseger70.sabercontroller.databinding.PageSaberBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
 import com.eseger70.sabercontroller.ui.MainPagerAdapter
 import com.eseger70.sabercontroller.ui.SectionedListAdapter
+import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
 
@@ -100,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bleManager = SaberBleManager(applicationContext)
+        applySystemInsets()
         setupPager()
         wireCommonUi()
         collectBleState()
@@ -128,6 +136,8 @@ class MainActivity : AppCompatActivity() {
                 else -> getString(R.string.tab_log)
             }
         }.attach()
+
+        applyTabStyles()
     }
 
     private fun wireCommonUi() {
@@ -141,6 +151,78 @@ class MainActivity : AppCompatActivity() {
             runWithBlePermissions {
                 bleManager.disconnect()
             }
+        }
+    }
+
+    private fun applySystemInsets() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val initialLeft = binding.root.paddingLeft
+        val initialTop = binding.root.paddingTop
+        val initialRight = binding.root.paddingRight
+        val initialBottom = binding.root.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                initialLeft + systemBars.left,
+                initialTop + systemBars.top,
+                initialRight + systemBars.right,
+                initialBottom + systemBars.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    private fun applyTabStyles() {
+        val titles = listOf(
+            R.string.tab_saber,
+            R.string.tab_tracks,
+            R.string.tab_log
+        )
+
+        titles.forEachIndexed { index, titleRes ->
+            binding.tabLayout.getTabAt(index)?.customView = createTabLabel(getString(titleRes))
+        }
+
+        updateTabStyles()
+        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) = updateTabStyles()
+
+            override fun onTabUnselected(tab: TabLayout.Tab) = updateTabStyles()
+
+            override fun onTabReselected(tab: TabLayout.Tab) = updateTabStyles()
+        })
+    }
+
+    private fun createTabLabel(title: String): TextView {
+        return TextView(this).apply {
+            text = title
+            gravity = Gravity.CENTER
+            minWidth = dp(84)
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+    }
+
+    private fun updateTabStyles() {
+        for (index in 0 until binding.tabLayout.tabCount) {
+            val label = binding.tabLayout.getTabAt(index)?.customView as? TextView ?: continue
+            val selected = index == binding.tabLayout.selectedTabPosition
+            label.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (selected) R.color.app_text_primary else R.color.app_header_text
+                )
+            )
+            label.background = if (selected) {
+                AppCompatResources.getDrawable(this, R.drawable.bg_tab_selected)
+            } else {
+                null
+            }
+            label.alpha = if (selected) 1.0f else 0.92f
         }
     }
 
@@ -735,5 +817,9 @@ class MainActivity : AppCompatActivity() {
     private fun displayTrackName(trackPath: String?): String {
         if (trackPath.isNullOrBlank()) return getString(R.string.state_none)
         return trackPath.substringAfterLast('/')
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 }

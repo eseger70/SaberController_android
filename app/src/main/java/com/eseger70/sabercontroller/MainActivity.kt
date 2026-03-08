@@ -480,7 +480,7 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun refreshTrackListInternal() {
         val result = runCommand(
-            command = "list_tracks",
+            command = "lt",
             awaitResponse = true,
             timeoutMs = 8_000L,
             successLog = false
@@ -499,7 +499,7 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun refreshNowPlayingInternal(logCompletion: Boolean = true) {
         val result = runCommand(
-            command = "get_track",
+            command = "gt",
             awaitResponse = true,
             successLog = logCompletion
         )
@@ -517,8 +517,14 @@ class MainActivity : AppCompatActivity() {
     private suspend fun playTrackInternal(trackPath: String) {
         trackStatus = "Play requested: ${displayTrackName(trackPath)}"
         renderAll()
+        val trackIndex = trackPaths.indexOf(trackPath)
+        val playCommand = if (trackIndex >= 0) {
+            "pt $trackIndex"
+        } else {
+            "play_track $trackPath"
+        }
         val result = runCommand(
-            command = "play_track $trackPath",
+            command = playCommand,
             awaitResponse = true,
             timeoutMs = 5_000L,
             successLog = false
@@ -535,7 +541,7 @@ class MainActivity : AppCompatActivity() {
 
         appendLog("Unable to confirm play_track response for $trackPath")
         val confirmation = runCommand(
-            command = "get_track",
+            command = "gt",
             awaitResponse = true,
             successLog = false
         )
@@ -554,14 +560,14 @@ class MainActivity : AppCompatActivity() {
         trackStatus = "Stop requested"
         renderAll()
         val result = runCommand(
-            command = "stop_track",
+            command = "st",
             awaitResponse = true,
             successLog = false
         )
         if (!result.success) return
 
         val confirmation = runCommand(
-            command = "get_track",
+            command = "gt",
             awaitResponse = true,
             successLog = false
         )

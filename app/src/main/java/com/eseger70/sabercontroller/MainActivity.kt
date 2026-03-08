@@ -545,12 +545,12 @@ class MainActivity : AppCompatActivity() {
         )
         if (!result.success) return
 
-        currentVolume = SaberCommandResponseParser.parseVolume(result.response)
+        currentVolume = SaberCommandResponseParser.parseVolume(result.response)?.coerceIn(0, MAX_VOLUME)
         renderAll()
     }
 
     private suspend fun setVolumeInternal(volume: Int) {
-        val normalized = volume.coerceIn(0, 3000)
+        val normalized = volume.coerceIn(0, MAX_VOLUME)
         if (currentVolume == normalized) {
             renderAll()
             return
@@ -745,7 +745,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindVolume(textView: TextView, seekBar: SeekBar) {
-        val volume = currentVolume
+        val volume = currentVolume?.coerceIn(0, MAX_VOLUME)
         suppressVolumeCallbacks = true
         textView.text = volume?.toString() ?: getString(R.string.volume_unknown)
         if (volume != null && seekBar.progress != volume) {
@@ -821,5 +821,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
+    }
+
+    companion object {
+        private const val MAX_VOLUME = 2000
     }
 }

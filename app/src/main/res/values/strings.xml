@@ -12,6 +12,7 @@
     <string name="stop_track">Stop Track</string>
     <string name="tab_saber">Saber</string>
     <string name="tab_tracks">Tracks</string>
+    <string name="tab_styles">Styles</string>
     <string name="tab_effects">Effects</string>
     <string name="tab_log">Log</string>
     <string name="connection_state_label">Connection status</string>
@@ -51,4 +52,19 @@
     <string name="last_frame_copied">Last frame copied to clipboard</string>
     <string name="no_frame_captured">No frame captured yet</string>
     <string name="track_count_empty">0 tracks</string>
+    <string name="styles_status_label">Style status</string>
+    <string name="styles_status_default">Mappings auto-apply before playback.</string>
+    <string name="styles_hint">Select a track, choose a saber preset on the Saber page, then bind that preset to the track, its album, its category, or the default fallback.</string>
+    <string name="selected_track_label">Selected track</string>
+    <string name="selected_category_label">Selected category</string>
+    <string name="selected_album_label">Selected album</string>
+    <string name="resolved_preset_label">Resolved preset</string>
+    <string name="styles_rules_label">Preset mappings</string>
+    <string name="styles_rules_hint">Rule precedence is track, then album, then category, then default.</string>
+    <string name="mapping_default_label">Default preset</string>
+    <string name="mapping_category_label">Category preset</string>
+    <string name="mapping_album_label">Album preset</string>
+    <string name="mapping_track_label">Track preset</string>
+    <string name="use_current_preset">Use Current Preset</string>
+    <string name="clear_mapping">Clear</string>
 </resources>

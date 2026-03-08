@@ -6,16 +6,18 @@ import androidx.recyclerview.widget.RecyclerView
 import com.eseger70.sabercontroller.databinding.PageEffectsBinding
 import com.eseger70.sabercontroller.databinding.PageLogBinding
 import com.eseger70.sabercontroller.databinding.PageSaberBinding
+import com.eseger70.sabercontroller.databinding.PageStylesBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
 
 class MainPagerAdapter(
     private val onSaberPageBound: (PageSaberBinding) -> Unit,
     private val onTracksPageBound: (PageTracksBinding) -> Unit,
+    private val onStylesPageBound: (PageStylesBinding) -> Unit,
     private val onEffectsPageBound: (PageEffectsBinding) -> Unit,
     private val onLogPageBound: (PageLogBinding) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    override fun getItemCount(): Int = 4
+    override fun getItemCount(): Int = 5
 
     override fun getItemViewType(position: Int): Int = position
 
@@ -28,6 +30,10 @@ class MainPagerAdapter(
 
             VIEW_TYPE_TRACKS -> TracksPageViewHolder(
                 PageTracksBinding.inflate(inflater, parent, false)
+            )
+
+            VIEW_TYPE_STYLES -> StylesPageViewHolder(
+                PageStylesBinding.inflate(inflater, parent, false)
             )
 
             VIEW_TYPE_EFFECTS -> EffectsPageViewHolder(
@@ -44,6 +50,7 @@ class MainPagerAdapter(
         when (holder) {
             is SaberPageViewHolder -> onSaberPageBound(holder.binding)
             is TracksPageViewHolder -> onTracksPageBound(holder.binding)
+            is StylesPageViewHolder -> onStylesPageBound(holder.binding)
             is EffectsPageViewHolder -> onEffectsPageBound(holder.binding)
             is LogPageViewHolder -> onLogPageBound(holder.binding)
         }
@@ -57,6 +64,10 @@ class MainPagerAdapter(
         val binding: PageTracksBinding
     ) : RecyclerView.ViewHolder(binding.root)
 
+    private class StylesPageViewHolder(
+        val binding: PageStylesBinding
+    ) : RecyclerView.ViewHolder(binding.root)
+
     private class EffectsPageViewHolder(
         val binding: PageEffectsBinding
     ) : RecyclerView.ViewHolder(binding.root)
@@ -68,6 +79,7 @@ class MainPagerAdapter(
     companion object {
         private const val VIEW_TYPE_SABER = 0
         private const val VIEW_TYPE_TRACKS = 1
-        private const val VIEW_TYPE_EFFECTS = 2
+        private const val VIEW_TYPE_STYLES = 2
+        private const val VIEW_TYPE_EFFECTS = 3
     }
 }

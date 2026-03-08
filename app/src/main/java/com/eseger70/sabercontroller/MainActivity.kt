@@ -31,7 +31,13 @@ import com.eseger70.sabercontroller.databinding.ActivityMainBinding
 import com.eseger70.sabercontroller.databinding.PageEffectsBinding
 import com.eseger70.sabercontroller.databinding.PageLogBinding
 import com.eseger70.sabercontroller.databinding.PageSaberBinding
+import com.eseger70.sabercontroller.databinding.PageStylesBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
+import com.eseger70.sabercontroller.track.MappingScope
+import com.eseger70.sabercontroller.track.ResolvedTrackPresetMapping
+import com.eseger70.sabercontroller.track.TrackContext
+import com.eseger70.sabercontroller.track.TrackPresetMappingRuleSet
+import com.eseger70.sabercontroller.track.TrackPresetMappingStore
 import com.eseger70.sabercontroller.ui.MainPagerAdapter
 import com.eseger70.sabercontroller.ui.SectionedListAdapter
 import com.google.android.material.tabs.TabLayout
@@ -42,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleManager: SaberBleManager
     private lateinit var pagerAdapter: MainPagerAdapter
+    private lateinit var trackPresetMappingStore: TrackPresetMappingStore
 
     private val logLines = ArrayDeque<String>()
     private var lastFrameLine: String? = null
@@ -51,6 +58,7 @@ class MainActivity : AppCompatActivity() {
 
     private var saberPageBinding: PageSaberBinding? = null
     private var tracksPageBinding: PageTracksBinding? = null
+    private var stylesPageBinding: PageStylesBinding? = null
     private var effectsPageBinding: PageEffectsBinding? = null
     private var logPageBinding: PageLogBinding? = null
 
@@ -75,8 +83,10 @@ class MainActivity : AppCompatActivity() {
     private var bladeState: Boolean? = null
     private var saberStatus: String = ""
     private var trackStatus: String = ""
+    private var stylesStatus: String = ""
     private var effectsStatus: String = ""
     private var nowPlaying: String? = null
+    private var selectedTrackPath: String? = null
     private var currentPresetIndex: Int? = null
     private var currentVolume: Int? = null
 
@@ -84,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     private var presetRows: List<SaberCommandResponseParser.PresetRow> = emptyList()
     private var trackPaths: List<String> = emptyList()
     private var trackRows: List<SaberCommandResponseParser.TrackRow> = emptyList()
+    private var trackPresetMappings: TrackPresetMappingRuleSet = TrackPresetMappingRuleSet()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -106,6 +117,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bleManager = SaberBleManager(applicationContext)
+        trackPresetMappingStore = TrackPresetMappingStore(applicationContext)
+        trackPresetMappings = trackPresetMappingStore.loadRuleSet()
         applySystemInsets()
         setupPager()
         wireCommonUi()
@@ -123,17 +136,19 @@ class MainActivity : AppCompatActivity() {
         pagerAdapter = MainPagerAdapter(
             onSaberPageBound = { pageBinding -> bindSaberPage(pageBinding) },
             onTracksPageBound = { pageBinding -> bindTracksPage(pageBinding) },
+            onStylesPageBound = { pageBinding -> bindStylesPage(pageBinding) },
             onEffectsPageBound = { pageBinding -> bindEffectsPage(pageBinding) },
             onLogPageBound = { pageBinding -> bindLogPage(pageBinding) }
         )
         binding.viewPager.adapter = pagerAdapter
-        binding.viewPager.offscreenPageLimit = 4
+        binding.viewPager.offscreenPageLimit = 5
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> getString(R.string.tab_saber)
                 1 -> getString(R.string.tab_tracks)
-                2 -> getString(R.string.tab_effects)
+                2 -> getString(R.string.tab_styles)
+                3 -> getString(R.string.tab_effects)
                 else -> getString(R.string.tab_log)
             }
         }.attach()
@@ -180,6 +195,7 @@ class MainActivity : AppCompatActivity() {
         val titles = listOf(
             R.string.tab_saber,
             R.string.tab_tracks,
+            R.string.tab_styles,
             R.string.tab_effects,
             R.string.tab_log
         )
@@ -311,6 +327,8 @@ class MainActivity : AppCompatActivity() {
         pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val row = trackRows.getOrNull(position)
             if (row is SaberCommandResponseParser.TrackRow.Track) {
+                selectedTrackPath = row.path
+                renderAll()
                 runWithBlePermissions {
                     launchBleTask { playTrackInternal(row.path) }
                 }
@@ -334,6 +352,37 @@ class MainActivity : AppCompatActivity() {
         })
 
         renderTracksPage(pageBinding)
+    }
+
+    private fun bindStylesPage(pageBinding: PageStylesBinding) {
+        stylesPageBinding = pageBinding
+
+        pageBinding.buttonSetDefaultMapping.setOnClickListener {
+            assignCurrentPresetToMapping(MappingScope.DEFAULT)
+        }
+        pageBinding.buttonClearDefaultMapping.setOnClickListener {
+            clearMapping(MappingScope.DEFAULT)
+        }
+        pageBinding.buttonSetCategoryMapping.setOnClickListener {
+            assignCurrentPresetToMapping(MappingScope.CATEGORY)
+        }
+        pageBinding.buttonClearCategoryMapping.setOnClickListener {
+            clearMapping(MappingScope.CATEGORY)
+        }
+        pageBinding.buttonSetAlbumMapping.setOnClickListener {
+            assignCurrentPresetToMapping(MappingScope.ALBUM)
+        }
+        pageBinding.buttonClearAlbumMapping.setOnClickListener {
+            clearMapping(MappingScope.ALBUM)
+        }
+        pageBinding.buttonSetTrackMapping.setOnClickListener {
+            assignCurrentPresetToMapping(MappingScope.TRACK)
+        }
+        pageBinding.buttonClearTrackMapping.setOnClickListener {
+            clearMapping(MappingScope.TRACK)
+        }
+
+        renderStylesPage(pageBinding)
     }
 
     private fun bindLogPage(pageBinding: PageLogBinding) {
@@ -393,6 +442,7 @@ class MainActivity : AppCompatActivity() {
                         if (state == ConnectionState.DISCONNECTED && previous != ConnectionState.DISCONNECTED) {
                             bladeState = null
                             nowPlaying = null
+                            selectedTrackPath = null
                             currentPresetIndex = null
                             currentVolume = null
                             presetEntries = emptyList()
@@ -401,6 +451,7 @@ class MainActivity : AppCompatActivity() {
                             trackRows = emptyList()
                             saberStatus = "Disconnected"
                             trackStatus = "Disconnected"
+                            stylesStatus = ""
                             effectsStatus = ""
                             renderAll()
                         }
@@ -599,6 +650,9 @@ class MainActivity : AppCompatActivity() {
 
         trackPaths = SaberCommandResponseParser.parseTrackPaths(result.response)
         trackRows = SaberCommandResponseParser.buildTrackRows(trackPaths)
+        if (selectedTrackPath !in trackPaths) {
+            selectedTrackPath = nowPlaying?.takeIf(trackPaths::contains)
+        }
         trackStatus = if (trackPaths.isEmpty()) {
             "No tracks returned by saber"
         } else {
@@ -616,6 +670,9 @@ class MainActivity : AppCompatActivity() {
         if (!result.success) return
 
         nowPlaying = SaberCommandResponseParser.parseNowPlaying(result.response)
+        if (selectedTrackPath == null && nowPlaying != null) {
+            selectedTrackPath = nowPlaying
+        }
         trackStatus = if (nowPlaying == null) {
             "Nothing playing"
         } else {
@@ -625,8 +682,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun playTrackInternal(trackPath: String) {
+        selectedTrackPath = trackPath
         trackStatus = "Play requested: ${displayTrackName(trackPath)}"
         renderAll()
+        if (!applyMappedPresetForTrackInternal(trackPath)) return
         val trackIndex = trackPaths.indexOf(trackPath)
         val playCommand = if (trackIndex >= 0) {
             "pt $trackIndex"
@@ -729,6 +788,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderAll() {
         saberPageBinding?.let { renderSaberPage(it) }
         tracksPageBinding?.let { renderTracksPage(it) }
+        stylesPageBinding?.let { renderStylesPage(it) }
         effectsPageBinding?.let { renderEffectsPage(it) }
         logPageBinding?.let { renderLogPage(it) }
     }
@@ -789,7 +849,8 @@ class MainActivity : AppCompatActivity() {
 
         trackAdapter.items = trackRows
         trackAdapter.selectedPosition = trackRows.indexOfFirst { row ->
-            row is SaberCommandResponseParser.TrackRow.Track && row.path == nowPlaying
+            row is SaberCommandResponseParser.TrackRow.Track &&
+                row.path == (selectedTrackPath ?: nowPlaying)
         }
 
         val canInteract = currentConnectionState == ConnectionState.READY
@@ -800,6 +861,50 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonRefreshVolume.isEnabled = canInteract
         pageBinding.seekVolume.isEnabled = canInteract
         bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
+    }
+
+    private fun renderStylesPage(pageBinding: PageStylesBinding) {
+        val currentTrackPath = activeTrackPath()
+        val trackContext = currentTrackContext()
+        val resolvedMapping = trackPresetMappings.resolve(currentTrackPath)
+        val currentPreset = currentPresetEntry()
+        val canAssignPreset = currentConnectionState == ConnectionState.READY &&
+            currentPreset != null &&
+            currentPreset.isHeader != true
+
+        pageBinding.textStylesStatusValue.text = when {
+            stylesStatus.isNotBlank() -> stylesStatus
+            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
+            else -> getString(R.string.styles_status_default)
+        }
+        pageBinding.textSelectedTrackValue.text = currentTrackPath ?: getString(R.string.state_none)
+        pageBinding.textSelectedCategoryValue.text = trackContext?.categoryKey?.let(::displayPathSegment)
+            ?: getString(R.string.state_none)
+        pageBinding.textSelectedAlbumValue.text = trackContext?.albumKey?.let(::displayPathLabel)
+            ?: getString(R.string.state_none)
+        pageBinding.textResolvedPresetValue.text = displayResolvedMapping(resolvedMapping)
+        pageBinding.textDefaultMappingValue.text = displayPresetIndex(trackPresetMappings.defaultPresetIndex)
+        pageBinding.textCategoryMappingValue.text = trackContext?.categoryKey?.let {
+            displayPresetIndex(trackPresetMappings.mappingFor(MappingScope.CATEGORY, it))
+        } ?: getString(R.string.state_none)
+        pageBinding.textAlbumMappingValue.text = trackContext?.albumKey?.let {
+            displayPresetIndex(trackPresetMappings.mappingFor(MappingScope.ALBUM, it))
+        } ?: getString(R.string.state_none)
+        pageBinding.textTrackMappingValue.text = currentTrackPath?.let {
+            displayPresetIndex(trackPresetMappings.mappingFor(MappingScope.TRACK, it))
+        } ?: getString(R.string.state_none)
+
+        pageBinding.buttonSetDefaultMapping.isEnabled = canAssignPreset
+        pageBinding.buttonClearDefaultMapping.isEnabled = trackPresetMappings.defaultPresetIndex != null
+        pageBinding.buttonSetCategoryMapping.isEnabled = canAssignPreset && trackContext?.categoryKey != null
+        pageBinding.buttonClearCategoryMapping.isEnabled =
+            trackContext?.categoryKey?.let { trackPresetMappings.mappingFor(MappingScope.CATEGORY, it) != null } == true
+        pageBinding.buttonSetAlbumMapping.isEnabled = canAssignPreset && trackContext?.albumKey != null
+        pageBinding.buttonClearAlbumMapping.isEnabled =
+            trackContext?.albumKey?.let { trackPresetMappings.mappingFor(MappingScope.ALBUM, it) != null } == true
+        pageBinding.buttonSetTrackMapping.isEnabled = canAssignPreset && currentTrackPath != null
+        pageBinding.buttonClearTrackMapping.isEnabled =
+            currentTrackPath?.let { trackPresetMappings.mappingFor(MappingScope.TRACK, it) != null } == true
     }
 
     private fun renderEffectsPage(pageBinding: PageEffectsBinding) {
@@ -910,6 +1015,157 @@ class MainActivity : AppCompatActivity() {
     private fun currentPresetEntry(): SaberCommandResponseParser.PresetEntry? {
         val targetIndex = currentPresetIndex ?: return null
         return presetEntries.firstOrNull { entry -> entry.index == targetIndex }
+    }
+
+    private fun activeTrackPath(): String? = selectedTrackPath ?: nowPlaying
+
+    private fun currentTrackContext(): TrackContext? = TrackContext.fromPath(activeTrackPath())
+
+    private fun assignCurrentPresetToMapping(scope: MappingScope) {
+        val currentPreset = currentPresetEntry()
+        if (currentPreset == null) {
+            stylesStatus = "Select a blade preset on the Saber page first."
+            renderAll()
+            return
+        }
+        if (currentPreset.isHeader) {
+            stylesStatus = "Header presets cannot be used for track mappings."
+            renderAll()
+            return
+        }
+        val mappingKey = mappingKeyForScope(scope)
+        if (scope != MappingScope.DEFAULT && mappingKey == null) {
+            stylesStatus = missingMappingContextMessage(scope)
+            renderAll()
+            return
+        }
+
+        trackPresetMappingStore.setMapping(scope, mappingKey, currentPreset.index)
+        trackPresetMappings = trackPresetMappingStore.loadRuleSet()
+        stylesStatus = "Mapped ${mappingScopeLabel(scope)} to ${currentPreset.displayName}"
+        renderAll()
+    }
+
+    private fun clearMapping(scope: MappingScope) {
+        val mappingKey = mappingKeyForScope(scope)
+        if (scope != MappingScope.DEFAULT && mappingKey == null) {
+            stylesStatus = missingMappingContextMessage(scope)
+            renderAll()
+            return
+        }
+
+        trackPresetMappingStore.setMapping(scope, mappingKey, null)
+        trackPresetMappings = trackPresetMappingStore.loadRuleSet()
+        stylesStatus = "Cleared ${mappingScopeLabel(scope)} mapping"
+        renderAll()
+    }
+
+    private fun mappingKeyForScope(scope: MappingScope): String? {
+        val trackContext = currentTrackContext()
+        return when (scope) {
+            MappingScope.DEFAULT -> null
+            MappingScope.CATEGORY -> trackContext?.categoryKey
+            MappingScope.ALBUM -> trackContext?.albumKey
+            MappingScope.TRACK -> activeTrackPath()
+        }
+    }
+
+    private fun missingMappingContextMessage(scope: MappingScope): String {
+        return when (scope) {
+            MappingScope.DEFAULT -> "Default mapping is always available."
+            MappingScope.CATEGORY -> "Select a track inside a category first."
+            MappingScope.ALBUM -> "Select a track inside an album first."
+            MappingScope.TRACK -> "Select a track first."
+        }
+    }
+
+    private suspend fun applyMappedPresetForTrackInternal(trackPath: String): Boolean {
+        val resolvedMapping = trackPresetMappings.resolve(trackPath) ?: return true
+        if (resolvedMapping.presetIndex == currentPresetIndex) {
+            stylesStatus = "Using ${displayResolvedMapping(resolvedMapping)}"
+            renderAll()
+            return true
+        }
+
+        val targetPreset = presetEntries.firstOrNull { entry -> entry.index == resolvedMapping.presetIndex }
+        if (targetPreset == null) {
+            stylesStatus = "Mapped preset #${resolvedMapping.presetIndex} is unavailable on this saber."
+            renderAll()
+            return true
+        }
+        if (targetPreset.isHeader) {
+            stylesStatus = "Mapped preset ${targetPreset.displayName} is a header preset."
+            renderAll()
+            return true
+        }
+
+        stylesStatus = "Applying ${mappingScopeLabel(resolvedMapping.scope)} preset ${targetPreset.displayName}"
+        renderAll()
+        val result = runCommand(
+            command = "set_preset ${targetPreset.index}",
+            awaitResponse = true,
+            timeoutMs = 5_000L,
+            successLog = false
+        )
+        if (!result.success) {
+            stylesStatus = "Failed to apply preset ${targetPreset.displayName}"
+            renderAll()
+            return false
+        }
+
+        currentPresetIndex = targetPreset.index
+        saberStatus = "Preset selected: ${targetPreset.displayName}"
+        stylesStatus = "Applied ${displayResolvedMapping(resolvedMapping)}"
+        renderAll()
+        return true
+    }
+
+    private fun displayPresetIndex(presetIndex: Int?): String {
+        if (presetIndex == null) return getString(R.string.state_none)
+        val preset = presetEntries.firstOrNull { entry -> entry.index == presetIndex }
+        return if (preset != null) {
+            preset.displayName
+        } else {
+            "Preset #$presetIndex"
+        }
+    }
+
+    private fun displayResolvedMapping(resolvedMapping: ResolvedTrackPresetMapping?): String {
+        if (resolvedMapping == null) return getString(R.string.state_none)
+        val presetText = displayPresetIndex(resolvedMapping.presetIndex)
+        return when (resolvedMapping.scope) {
+            MappingScope.DEFAULT -> "Default -> $presetText"
+            MappingScope.CATEGORY -> "Category ${displayPathSegment(resolvedMapping.key)} -> $presetText"
+            MappingScope.ALBUM -> "Album ${displayPathLabel(resolvedMapping.key)} -> $presetText"
+            MappingScope.TRACK -> "Track -> $presetText"
+        }
+    }
+
+    private fun mappingScopeLabel(scope: MappingScope): String {
+        return when (scope) {
+            MappingScope.DEFAULT -> "default preset"
+            MappingScope.CATEGORY -> "category preset"
+            MappingScope.ALBUM -> "album preset"
+            MappingScope.TRACK -> "track preset"
+        }
+    }
+
+    private fun displayPathSegment(raw: String?): String {
+        return raw
+            ?.split('/')
+            ?.lastOrNull()
+            ?.replace('_', ' ')
+            ?.ifBlank { null }
+            ?: getString(R.string.state_none)
+    }
+
+    private fun displayPathLabel(raw: String?): String {
+        return raw
+            ?.split('/')
+            ?.filter { it.isNotBlank() }
+            ?.joinToString(" / ") { it.replace('_', ' ') }
+            ?.ifBlank { null }
+            ?: getString(R.string.state_none)
     }
 
     private fun displayTrackName(trackPath: String?): String {

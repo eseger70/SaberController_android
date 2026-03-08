@@ -21,6 +21,7 @@ Android BLE controller app for ProffieOS-based saber control.
 - Show a two-tab UI with shared connection/log state
 - Show grouped preset headers using the `_sub_` naming convention
 - Show a grouped track list with tap-to-play flow
+- Auto-apply preset mappings for track, album, category, or default playback rules
 
 ## BLE Protocol
 
@@ -45,6 +46,12 @@ Supported app commands:
 - `play_track <path>`
 - `stop_track`
 - `get_track`
+- Short transport aliases used by the app where supported:
+  - `lt`
+  - `pt <index>`
+  - `st`
+  - `gt`
+  - `cl`, `sb`, `fo`, `bt`, `lk`, `dg`, `lb`, `mt`
 
 ## Build / Run
 
@@ -73,11 +80,15 @@ For local CLI builds, Android SDK path must also be configured via Android Studi
    - tap a non-header preset to select it
    - use the volume refresh button or slider
 5. On the `Tracks` tab:
-   - tap `Refresh Tracks` to reload available paths
-   - tap a track row to send `play_track <path>`
-   - use `Now Playing` and `Stop Track` as needed
-   - use the volume refresh button or slider
-6. Inspect the shared log panel for `TX`, `RX`, and framed responses.
+    - tap `Refresh Tracks` to reload available paths
+    - tap a track row to play it
+    - use `Now Playing` and `Stop Track` as needed
+    - use the volume refresh button or slider
+6. On the `Styles` tab:
+   - select a preset on the `Saber` tab
+   - bind that preset to the selected track, its album, its category, or the default fallback
+   - track playback will resolve mappings in this order: track, album, category, default
+7. Inspect the shared log panel for `TX`, `RX`, and framed responses.
 
 ## Notes
 
@@ -85,6 +96,7 @@ For local CLI builds, Android SDK path must also be configured via Android Studi
 - The parser is resilient to notification packet fragmentation.
 - Command sending uses a serialized command lock with timeout/retry behavior for awaited responses.
 - Track browsing is currently path-based because the current firmware command surface is path-based.
+- Track style associations are implemented app-side as preset mappings. The app applies `set_preset <index>` before playback when a matching rule exists.
 - Presets whose names start with `_sub_` are treated as non-selectable category headers in the UI.
 - If a header preset is currently selected, the app blocks ignition until a real preset is chosen.
 

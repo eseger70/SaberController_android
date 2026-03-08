@@ -119,22 +119,39 @@ class SaberCommandResponseParserTest {
     }
 
     @Test
-    fun buildTrackRowsGroupsTracksByFolder() {
+    fun buildTrackRowsBuildsNestedHierarchy() {
         val result = SaberCommandResponseParser.buildTrackRows(
             listOf(
                 "tracks/mars.wav",
-                "tracks/duel.wav",
-                "Fonts/ObiWan/tracks/theme.wav"
+                "tracks/Christmas/album_a/song_1.wav",
+                "tracks/Christmas/album_a/song_2.wav",
+                "Artist_1/tracks/album_d/song_3.wav"
             )
         )
 
         assertEquals(
             listOf(
-                SaberCommandResponseParser.TrackRow.Header("Tracks"),
-                SaberCommandResponseParser.TrackRow.Track("tracks/mars.wav", "mars.wav"),
-                SaberCommandResponseParser.TrackRow.Track("tracks/duel.wav", "duel.wav"),
-                SaberCommandResponseParser.TrackRow.Header("Fonts/ObiWan"),
-                SaberCommandResponseParser.TrackRow.Track("Fonts/ObiWan/tracks/theme.wav", "theme.wav")
+                SaberCommandResponseParser.TrackRow.Header("Tracks", 0),
+                SaberCommandResponseParser.TrackRow.Track("tracks/mars.wav", "mars.wav", 0),
+                SaberCommandResponseParser.TrackRow.Header("Christmas", 0),
+                SaberCommandResponseParser.TrackRow.Header("album a", 1),
+                SaberCommandResponseParser.TrackRow.Track(
+                    "tracks/Christmas/album_a/song_1.wav",
+                    "song_1.wav",
+                    2
+                ),
+                SaberCommandResponseParser.TrackRow.Track(
+                    "tracks/Christmas/album_a/song_2.wav",
+                    "song_2.wav",
+                    2
+                ),
+                SaberCommandResponseParser.TrackRow.Header("Artist 1", 0),
+                SaberCommandResponseParser.TrackRow.Header("album d", 1),
+                SaberCommandResponseParser.TrackRow.Track(
+                    "Artist_1/tracks/album_d/song_3.wav",
+                    "song_3.wav",
+                    2
+                )
             ),
             result
         )

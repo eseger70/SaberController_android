@@ -65,14 +65,10 @@ class MainActivity : AppCompatActivity() {
     private val trackAdapter by lazy {
         SectionedListAdapter<SaberCommandResponseParser.TrackRow>(
             context = this,
-            labelProvider = { row ->
-                when (row) {
-                    is SaberCommandResponseParser.TrackRow.Header -> row.title
-                    is SaberCommandResponseParser.TrackRow.Track -> row.displayName
-                }
-            },
+            labelProvider = { row -> row.label },
             headerProvider = { row -> row is SaberCommandResponseParser.TrackRow.Header },
-            enabledProvider = { row -> row is SaberCommandResponseParser.TrackRow.Track }
+            enabledProvider = { row -> row is SaberCommandResponseParser.TrackRow.Track },
+            levelProvider = { row -> row.level }
         )
     }
 
@@ -362,14 +358,14 @@ class MainActivity : AppCompatActivity() {
     private fun bindEffectsPage(pageBinding: PageEffectsBinding) {
         effectsPageBinding = pageBinding
 
-        pageBinding.buttonClash.setOnClickListener { triggerEffect("clash", "Clash triggered") }
-        pageBinding.buttonStab.setOnClickListener { triggerEffect("stab", "Stab triggered") }
-        pageBinding.buttonForce.setOnClickListener { triggerEffect("force", "Force effect triggered") }
-        pageBinding.buttonBlast.setOnClickListener { triggerEffect("blast", "Blast triggered") }
-        pageBinding.buttonLockup.setOnClickListener { triggerEffect("lockup", "Lockup toggled") }
-        pageBinding.buttonDrag.setOnClickListener { triggerEffect("drag", "Drag toggled") }
-        pageBinding.buttonLightningBlock.setOnClickListener { triggerEffect("lblock", "Lightning block toggled") }
-        pageBinding.buttonMelt.setOnClickListener { triggerEffect("melt", "Melt toggled") }
+        pageBinding.buttonClash.setOnClickListener { triggerEffect("cl", "Clash triggered") }
+        pageBinding.buttonStab.setOnClickListener { triggerEffect("sb", "Stab triggered") }
+        pageBinding.buttonForce.setOnClickListener { triggerEffect("fo", "Force effect triggered") }
+        pageBinding.buttonBlast.setOnClickListener { triggerEffect("bt", "Blast triggered") }
+        pageBinding.buttonLockup.setOnClickListener { triggerEffect("lk", "Lockup toggled") }
+        pageBinding.buttonDrag.setOnClickListener { triggerEffect("dg", "Drag toggled") }
+        pageBinding.buttonLightningBlock.setOnClickListener { triggerEffect("lb", "Lightning block toggled") }
+        pageBinding.buttonMelt.setOnClickListener { triggerEffect("mt", "Melt toggled") }
 
         renderEffectsPage(pageBinding)
     }

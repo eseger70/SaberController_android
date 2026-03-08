@@ -37,8 +37,23 @@ object SaberCommandResponseParser {
     }
 
     sealed class TrackRow {
-        data class Header(val title: String) : TrackRow()
-        data class Track(val path: String, val displayName: String) : TrackRow()
+        abstract val level: Int
+        abstract val label: String
+
+        data class Header(
+            val title: String,
+            override val level: Int
+        ) : TrackRow() {
+            override val label: String = title
+        }
+
+        data class Track(
+            val path: String,
+            val displayName: String,
+            override val level: Int
+        ) : TrackRow() {
+            override val label: String = displayName
+        }
     }
 
     fun parseBladeState(response: String?): Boolean? {
@@ -132,14 +147,38 @@ object SaberCommandResponseParser {
         if (trackPaths.isEmpty()) return emptyList()
 
         val rows = mutableListOf<TrackRow>()
-        var lastHeader: String? = null
+        var previousDirectories: List<String> = emptyList()
+        var emittedRootHeader = false
         for (path in trackPaths) {
-            val header = trackGroupLabel(path)
-            if (header != lastHeader) {
-                rows.add(TrackRow.Header(header))
-                lastHeader = header
+            val segments = visibleTrackSegments(path)
+            if (segments.isEmpty()) continue
+
+            val directories = segments.dropLast(1)
+            if (directories.isEmpty()) {
+                if (!emittedRootHeader || previousDirectories.isNotEmpty()) {
+                    rows.add(TrackRow.Header(title = "Tracks", level = 0))
+                    emittedRootHeader = true
+                }
+            } else {
+                emittedRootHeader = false
+                val sharedDepth = sharedPrefixLength(previousDirectories, directories)
+                for (index in sharedDepth until directories.size) {
+                    rows.add(
+                        TrackRow.Header(
+                            title = displayDirectoryName(directories[index]),
+                            level = index
+                        )
+                    )
+                }
             }
-            rows.add(TrackRow.Track(path = path, displayName = path.substringAfterLast('/')))
+            rows.add(
+                TrackRow.Track(
+                    path = path,
+                    displayName = path.substringAfterLast('/'),
+                    level = directories.size
+                )
+            )
+            previousDirectories = directories
         }
         return rows
     }
@@ -170,15 +209,25 @@ object SaberCommandResponseParser {
         return rawValue.ifBlank { null }
     }
 
-    private fun trackGroupLabel(path: String): String {
-        val directory = path.substringBeforeLast('/', "")
-        if (directory.isBlank()) return "Tracks"
-        if (directory.equals("tracks", ignoreCase = true)) return "Tracks"
-        if (directory.endsWith("/tracks", ignoreCase = true)) {
-            return directory.substringBeforeLast("/tracks")
-                .ifBlank { "Tracks" }
+    private fun visibleTrackSegments(path: String): List<String> {
+        return path
+            .split('/')
+            .filter { it.isNotBlank() }
+            .filterNot { it.equals("tracks", ignoreCase = true) }
+    }
+
+    private fun sharedPrefixLength(first: List<String>, second: List<String>): Int {
+        val max = minOf(first.size, second.size)
+        for (index in 0 until max) {
+            if (!first[index].equals(second[index], ignoreCase = true)) {
+                return index
+            }
         }
-        return directory
+        return max
+    }
+
+    private fun displayDirectoryName(raw: String): String {
+        return raw.replace('_', ' ').ifBlank { raw }
     }
 
     private fun String.isTrackPath(): Boolean {

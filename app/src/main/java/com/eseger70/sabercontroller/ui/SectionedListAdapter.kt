@@ -16,11 +16,13 @@ class SectionedListAdapter<T>(
     context: Context,
     private val labelProvider: (T) -> String,
     private val headerProvider: (T) -> Boolean,
-    private val enabledProvider: (T) -> Boolean
+    private val enabledProvider: (T) -> Boolean,
+    private val levelProvider: (T) -> Int = { 0 }
 ) : BaseAdapter() {
     private val inflater = LayoutInflater.from(context)
     private val horizontalPadding = dp(context, 16)
     private val nestedPadding = dp(context, 32)
+    private val indentStep = dp(context, 18)
     private val verticalPadding = dp(context, 12)
     private val selectedColor = ContextCompat.getColor(context, R.color.app_selected_row)
     private val headerRowColor = ContextCompat.getColor(context, R.color.app_header_row)
@@ -60,6 +62,7 @@ class SectionedListAdapter<T>(
         val item = getItem(position)
         val isHeader = headerProvider(item)
         val isEnabled = enabledProvider(item)
+        val level = levelProvider(item).coerceAtLeast(0)
 
         val rawLabel = labelProvider(item)
         textView.text = if (isHeader) rawLabel.uppercase(Locale.getDefault()) else rawLabel
@@ -75,8 +78,9 @@ class SectionedListAdapter<T>(
         )
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (isHeader) 12f else 16f)
         textView.letterSpacing = if (isHeader) 0.08f else 0.01f
+        val leftPadding = (if (isHeader) horizontalPadding else nestedPadding) + (level * indentStep)
         textView.setPadding(
-            if (isHeader) horizontalPadding else nestedPadding,
+            leftPadding,
             verticalPadding,
             horizontalPadding,
             verticalPadding

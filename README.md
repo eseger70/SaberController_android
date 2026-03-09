@@ -70,6 +70,27 @@ The first wrapper run will download Gradle automatically. A local JDK is still r
 GitHub Actions CI is also configured to run unit tests and build a debug APK on pushes and pull requests.
 For local CLI builds, Android SDK path must also be configured via Android Studio, `ANDROID_HOME`, or `local.properties`.
 
+## ADB Workflow
+
+Use ADB for faster install and log capture:
+
+- install/update the debug build:
+  - `adb install -r app\build\outputs\apk\debug\app-debug.apk`
+- confirm the device is visible:
+  - `adb devices`
+- clear old app logs before a test run:
+  - `adb logcat -c`
+- watch only the app's mirrored debug logs:
+  - `adb logcat -v time SaberCtrl:D SaberCtrlTx:I SaberCtrlRx:I SaberCtrlFrm:I SaberCtrlWarn:W *:S`
+
+The app mirrors its in-app log panel to logcat under these tags:
+
+- `SaberCtrl`
+- `SaberCtrlTx`
+- `SaberCtrlRx`
+- `SaberCtrlFrm`
+- `SaberCtrlWarn`
+
 ## Usage
 
 1. Tap `Connect`.

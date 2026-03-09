@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -47,6 +48,16 @@ import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val MAX_VOLUME = 2000
+        private const val LOG_TAG_APP = "SaberCtrl"
+        private const val LOG_TAG_TX = "SaberCtrlTx"
+        private const val LOG_TAG_RX = "SaberCtrlRx"
+        private const val LOG_TAG_FRAME = "SaberCtrlFrm"
+        private const val LOG_TAG_WARN = "SaberCtrlWarn"
+        private const val LOGCAT_CHUNK_SIZE = 3_500
+    }
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleManager: SaberBleManager
     private lateinit var pagerAdapter: MainPagerAdapter
@@ -1023,7 +1034,39 @@ class MainActivity : AppCompatActivity() {
             lastFrameLine = line
         }
         logLines.addLast(line)
+        mirrorLogLineToLogcat(line)
         logPageBinding?.let { renderLogPage(it) }
+    }
+
+    private fun mirrorLogLineToLogcat(line: String) {
+        val (tag, priority) = when {
+            line.startsWith("TX >>") -> LOG_TAG_TX to Log.INFO
+            line.startsWith("RX <<") -> LOG_TAG_RX to Log.INFO
+            line.startsWith("FRAME <<") || line.startsWith("FRAME<<") -> LOG_TAG_FRAME to Log.INFO
+            line.contains("failed", ignoreCase = true) ||
+                line.contains("denied", ignoreCase = true) ||
+                line.contains("timeout", ignoreCase = true) -> LOG_TAG_WARN to Log.WARN
+            else -> LOG_TAG_APP to Log.DEBUG
+        }
+
+        if (line.length <= LOGCAT_CHUNK_SIZE) {
+            writeLogcat(tag, priority, line)
+            return
+        }
+
+        val chunks = line.chunked(LOGCAT_CHUNK_SIZE)
+        chunks.forEachIndexed { index, chunk ->
+            writeLogcat(tag, priority, "[${index + 1}/${chunks.size}] $chunk")
+        }
+    }
+
+    private fun writeLogcat(tag: String, priority: Int, message: String) {
+        when (priority) {
+            Log.WARN -> Log.w(tag, message)
+            Log.ERROR -> Log.e(tag, message)
+            Log.INFO -> Log.i(tag, message)
+            else -> Log.d(tag, message)
+        }
     }
 
     private fun buildLogText(): String = logLines.joinToString(separator = "\n")
@@ -1234,7 +1277,4 @@ class MainActivity : AppCompatActivity() {
         return (value * resources.displayMetrics.density).toInt()
     }
 
-    companion object {
-        private const val MAX_VOLUME = 2000
-    }
 }

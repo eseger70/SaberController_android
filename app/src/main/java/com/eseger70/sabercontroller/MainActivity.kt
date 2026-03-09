@@ -404,7 +404,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         pageBinding.inputRawCommand.doAfterTextChanged {
-            renderLogPage(pageBinding)
+            updateRawCommandControls(pageBinding)
         }
 
         pageBinding.inputRawCommand.setOnEditorActionListener { _, actionId, _ ->
@@ -1002,12 +1002,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderLogPage(pageBinding: PageLogBinding) {
         pageBinding.textLog.text = buildLogText()
-        val hasCommand = !pageBinding.inputRawCommand.text.isNullOrBlank()
-        pageBinding.buttonSendRawCommand.isEnabled =
-            currentConnectionState == ConnectionState.READY && hasCommand
+        updateRawCommandControls(pageBinding)
         pageBinding.scrollLog.post {
             pageBinding.scrollLog.fullScroll(View.FOCUS_DOWN)
         }
+    }
+
+    private fun updateRawCommandControls(pageBinding: PageLogBinding) {
+        val hasCommand = !pageBinding.inputRawCommand.text.isNullOrBlank()
+        pageBinding.buttonSendRawCommand.isEnabled =
+            currentConnectionState == ConnectionState.READY && hasCommand
     }
 
     private fun appendLog(line: String) {

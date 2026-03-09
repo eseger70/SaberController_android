@@ -51,6 +51,13 @@
     <string name="log_copied">Log copied to clipboard</string>
     <string name="last_frame_copied">Last frame copied to clipboard</string>
     <string name="no_frame_captured">No frame captured yet</string>
+    <string name="raw_command_label">Raw BLE Command</string>
+    <string name="raw_command_hint">Send any firmware command over the current BLE session for testing or diagnostics.</string>
+    <string name="raw_command_field_hint">Example: tvg or tps auto</string>
+    <string name="await_response">Await framed response</string>
+    <string name="send_command">Send</string>
+    <string name="raw_command_empty">Enter a command first</string>
+    <string name="raw_command_requires_connection">Connect to the saber before sending raw commands</string>
     <string name="track_count_empty">0 tracks</string>
     <string name="styles_status_label">Style status</string>
     <string name="styles_status_default">Mappings auto-apply before playback.</string>

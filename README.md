@@ -22,6 +22,7 @@ Android BLE controller app for ProffieOS-based saber control.
 - Show grouped preset headers using the `_sub_` naming convention
 - Show a grouped track list with tap-to-play flow
 - Auto-apply preset mappings for track, album, category, or default playback rules
+- Send arbitrary raw BLE commands from the `Log` tab for firmware testing
 
 ## BLE Protocol
 
@@ -89,6 +90,7 @@ For local CLI builds, Android SDK path must also be configured via Android Studi
    - bind that preset to the selected track, its album, its category, or the default fallback
    - track playback will resolve mappings in this order: track, album, category, default
 7. Inspect the shared log panel for `TX`, `RX`, and framed responses.
+8. On the `Log` tab, use the raw command box to send firmware commands such as `tpg`, `tvg`, `tvl`, `tvs 1`, or `tps auto`.
 
 ## Notes
 
@@ -99,6 +101,7 @@ For local CLI builds, Android SDK path must also be configured via Android Studi
 - Track style associations are implemented app-side as preset mappings. The app applies `set_preset <index>` before playback when a matching rule exists.
 - Presets whose names start with `_sub_` are treated as non-selectable category headers in the UI.
 - If a header preset is currently selected, the app blocks ignition until a real preset is chosen.
+- The `Log` tab raw command console uses the same BLE transport and framed response parsing as the rest of the app, so it is the preferred surface for testing new firmware commands before dedicated UI is added.
 
 ## Troubleshooting
 

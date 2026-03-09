@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.AdapterView
 import android.widget.SeekBar
 import android.widget.TextView
@@ -21,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -398,6 +400,44 @@ class MainActivity : AppCompatActivity() {
                 showToast(getString(R.string.no_frame_captured))
             } else {
                 copyTextToClipboard(frame, getString(R.string.last_frame_copied))
+            }
+        }
+
+        pageBinding.inputRawCommand.doAfterTextChanged {
+            renderLogPage(pageBinding)
+        }
+
+        pageBinding.inputRawCommand.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE) {
+                pageBinding.buttonSendRawCommand.performClick()
+                true
+            } else {
+                false
+            }
+        }
+
+        pageBinding.buttonSendRawCommand.setOnClickListener {
+            val command = pageBinding.inputRawCommand.text
+                ?.toString()
+                ?.trim()
+                .orEmpty()
+            if (command.isBlank()) {
+                showToast(getString(R.string.raw_command_empty))
+                return@setOnClickListener
+            }
+            if (currentConnectionState != ConnectionState.READY) {
+                showToast(getString(R.string.raw_command_requires_connection))
+                return@setOnClickListener
+            }
+
+            val awaitResponse = pageBinding.checkAwaitResponse.isChecked
+            runWithBlePermissions {
+                launchBleTask {
+                    sendRawCommandInternal(
+                        command = command,
+                        awaitResponse = awaitResponse
+                    )
+                }
             }
         }
 
@@ -785,6 +825,16 @@ class MainActivity : AppCompatActivity() {
         renderAll()
     }
 
+    private suspend fun sendRawCommandInternal(command: String, awaitResponse: Boolean) {
+        runCommand(
+            command = command,
+            awaitResponse = awaitResponse,
+            timeoutMs = if (awaitResponse) 5_000L else 2_000L,
+            retries = 1,
+            successLog = true
+        )
+    }
+
     private fun renderAll() {
         saberPageBinding?.let { renderSaberPage(it) }
         tracksPageBinding?.let { renderTracksPage(it) }
@@ -952,6 +1002,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderLogPage(pageBinding: PageLogBinding) {
         pageBinding.textLog.text = buildLogText()
+        val hasCommand = !pageBinding.inputRawCommand.text.isNullOrBlank()
+        pageBinding.buttonSendRawCommand.isEnabled =
+            currentConnectionState == ConnectionState.READY && hasCommand
         pageBinding.scrollLog.post {
             pageBinding.scrollLog.fullScroll(View.FOCUS_DOWN)
         }

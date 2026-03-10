@@ -52,6 +52,9 @@ Supported app commands:
   - `pt <index>`
   - `st`
   - `gt`
+  - `tpa`
+  - `trs`
+  - `ttp`
   - `tvl`
   - `tvg`
   - `tvs <id>`
@@ -109,8 +112,12 @@ The app mirrors its in-app log panel to logcat under these tags:
    - use the volume refresh button or slider
 5. On the `Tracks` tab:
     - tap `Refresh Tracks` to reload available paths
+    - tap a folder/category header to select its queue scope
+    - use `Play Folder` to start queued playback for the selected folder or category
     - tap a track row to play it
-    - use `Now Playing` and `Stop Track` as needed
+    - use `Previous`, `Play / Pause`, `Next`, and `Stop Track` as needed
+    - use `Repeat Folder` if you want the current folder queue to wrap
+    - use `Now Playing` to force a fresh `gt` sync
     - use the volume refresh button or slider
 6. On the `Visuals` tab:
    - choose playback mode: `Auto`, `Saber`, or `Music`
@@ -126,6 +133,8 @@ The app mirrors its in-app log panel to logcat under these tags:
 - The parser is resilient to notification packet fragmentation.
 - Command sending uses a serialized command lock with timeout/retry behavior for awaited responses.
 - Track browsing is currently path-based because the current firmware command surface is path-based.
+- Folder playback queues are app-driven; the app advances to the next track in the selected folder/category by polling `gt` silently while queued playback is active.
+- Track pause/resume is firmware-backed via `pause_track`, `resume_track`, and `toggle_track_pause`.
 - Track visuals are implemented firmware-side. The app no longer switches presets before playback.
 - `Auto` preserves saber behavior while the blade is on and uses the selected track visual while the blade is off.
 - `Music` requires the blade to be off. If the blade is on, playback is rejected with `TRACK_VISUAL_REJECTED=blade_on`.

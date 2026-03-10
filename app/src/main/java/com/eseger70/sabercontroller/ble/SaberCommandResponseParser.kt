@@ -9,6 +9,7 @@ object SaberCommandResponseParser {
     data class TrackRuntimeState(
         val nowPlaying: String? = null,
         val trackActive: Boolean? = null,
+        val trackPaused: Boolean? = null,
         val policy: String? = null,
         val sessionMode: String? = null,
         val visualSelectedId: Int? = null,
@@ -310,6 +311,42 @@ object SaberCommandResponseParser {
         return keys
     }
 
+    fun deepestTrackHeaderKey(trackPath: String?): String? {
+        return trackHeaderKeysForPath(trackPath).lastOrNull()
+    }
+
+    fun trackHeaderLabel(headerKey: String?): String? {
+        if (headerKey.isNullOrBlank()) return null
+        if (headerKey == ROOT_TRACKS_HEADER_KEY) return "Tracks"
+        return headerKey
+            .split('/')
+            .filter { it.isNotBlank() }
+            .joinToString(" / ") { segment -> displayDirectoryName(segment) }
+            .ifBlank { null }
+    }
+
+    fun tracksForHeader(
+        trackPaths: List<String>,
+        headerKey: String?
+    ): List<String> {
+        if (trackPaths.isEmpty() || headerKey.isNullOrBlank()) return emptyList()
+
+        if (headerKey == ROOT_TRACKS_HEADER_KEY) {
+            return trackPaths.filter { visibleTrackSegments(it).dropLast(1).isEmpty() }
+        }
+
+        val headerSegments = headerKey
+            .split('/')
+            .filter { it.isNotBlank() }
+        if (headerSegments.isEmpty()) return emptyList()
+
+        return trackPaths.filter { path ->
+            val directories = visibleTrackSegments(path).dropLast(1)
+            directories.size >= headerSegments.size &&
+                directories.take(headerSegments.size) == headerSegments
+        }
+    }
+
     fun parseNowPlaying(response: String?): String? {
         if (response.isNullOrBlank()) return null
 
@@ -352,6 +389,7 @@ object SaberCommandResponseParser {
         val fields = parseFieldMap(response)
         val nowPlaying = parseNowPlaying(response)
         val trackActive = fields["TRACK_ACTIVE"]?.toBooleanFlag()
+        val trackPaused = fields["TRACK_PAUSED"]?.toBooleanFlag()
         val policy = fields["TRACK_POLICY"]?.ifBlank { null }
         val sessionMode = fields["TRACK_SESSION_MODE"]?.ifBlank { null }
         val visualSelectedId = fields["TRACK_VISUAL_SELECTED"]?.toIntOrNull()
@@ -366,6 +404,7 @@ object SaberCommandResponseParser {
         if (
             nowPlaying == null &&
             trackActive == null &&
+            trackPaused == null &&
             policy == null &&
             sessionMode == null &&
             visualSelectedId == null &&
@@ -383,6 +422,7 @@ object SaberCommandResponseParser {
         return TrackRuntimeState(
             nowPlaying = nowPlaying,
             trackActive = trackActive,
+            trackPaused = trackPaused,
             policy = policy,
             sessionMode = sessionMode,
             visualSelectedId = visualSelectedId,

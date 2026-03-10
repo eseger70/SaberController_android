@@ -246,6 +246,48 @@ class SaberCommandResponseParserTest {
     }
 
     @Test
+    fun tracksForHeaderReturnsNestedDescendants() {
+        val trackPaths = listOf(
+            "tracks/mars.wav",
+            "tracks/Christmas/album_a/song_1.wav",
+            "tracks/Christmas/album_a/song_2.wav",
+            "tracks/Christmas/album_b/song_3.wav"
+        )
+
+        assertEquals(
+            listOf(
+                "tracks/Christmas/album_a/song_1.wav",
+                "tracks/Christmas/album_a/song_2.wav",
+                "tracks/Christmas/album_b/song_3.wav"
+            ),
+            SaberCommandResponseParser.tracksForHeader(trackPaths, "Christmas")
+        )
+        assertEquals(
+            listOf(
+                "tracks/Christmas/album_a/song_1.wav",
+                "tracks/Christmas/album_a/song_2.wav"
+            ),
+            SaberCommandResponseParser.tracksForHeader(trackPaths, "Christmas/album_a")
+        )
+        assertEquals(
+            listOf("tracks/mars.wav"),
+            SaberCommandResponseParser.tracksForHeader(trackPaths, "__root_tracks__")
+        )
+    }
+
+    @Test
+    fun deepestTrackHeaderKeyReturnsRootForRootTrack() {
+        assertEquals(
+            "__root_tracks__",
+            SaberCommandResponseParser.deepestTrackHeaderKey("tracks/mars.wav")
+        )
+        assertEquals(
+            "Christmas/album_a",
+            SaberCommandResponseParser.deepestTrackHeaderKey("tracks/Christmas/album_a/song_1.wav")
+        )
+    }
+
+    @Test
     fun parseTrackVisualOptionsReadsIdsAndNames() {
         val result = SaberCommandResponseParser.parseTrackVisualOptions(
             """
@@ -271,6 +313,7 @@ class SaberCommandResponseParserTest {
             """
             Playing tracks/mars.wav
             TRACK_ACTIVE=1
+            TRACK_PAUSED=0
             TRACK_POLICY=auto
             TRACK_SESSION_MODE=visual
             TRACK_VISUAL_SELECTED=1
@@ -283,6 +326,7 @@ class SaberCommandResponseParserTest {
 
         assertEquals("tracks/mars.wav", result?.nowPlaying)
         assertEquals(true, result?.trackActive)
+        assertEquals(false, result?.trackPaused)
         assertEquals("auto", result?.policy)
         assertEquals("visual", result?.sessionMode)
         assertEquals(1, result?.visualSelectedId)
@@ -326,5 +370,23 @@ class SaberCommandResponseParserTest {
         assertEquals("Blue Pulse", result?.visualName)
         assertEquals(true, result?.visualActive)
         assertEquals(true, result?.visualPreviewActive)
+    }
+
+    @Test
+    fun parseTrackRuntimeStateReadsPausedField() {
+        val result = SaberCommandResponseParser.parseTrackRuntimeState(
+            """
+            tracks/mars.wav
+            TRACK_ACTIVE=1
+            TRACK_PAUSED=1
+            TRACK_POLICY=auto
+            TRACK_SESSION_MODE=audio_only
+            """.trimIndent()
+        )
+
+        assertEquals("tracks/mars.wav", result?.nowPlaying)
+        assertEquals(true, result?.trackActive)
+        assertEquals(true, result?.trackPaused)
+        assertEquals("audio_only", result?.sessionMode)
     }
 }

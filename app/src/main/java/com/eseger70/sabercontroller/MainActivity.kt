@@ -41,6 +41,9 @@ import com.eseger70.sabercontroller.ui.MainPagerAdapter
 import com.eseger70.sabercontroller.ui.SectionedListAdapter
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -140,8 +143,10 @@ class MainActivity : AppCompatActivity() {
     private var effectsStatus: String = ""
     private var nowPlaying: String? = null
     private var selectedTrackPath: String? = null
+    private var selectedTrackHeaderKey: String? = null
     private var currentPresetIndex: Int? = null
     private var currentVolume: Int? = null
+    private var trackPaused: Boolean? = null
     private var trackPolicy: String? = null
     private var trackSessionMode: String? = null
     private var trackVisualSelectedId: Int? = null
@@ -149,6 +154,9 @@ class MainActivity : AppCompatActivity() {
     private var trackVisualActive: Boolean? = null
     private var trackVisualActiveName: String? = null
     private var trackVisualPreviewActive: Boolean? = null
+    private var queueScopeHeaderKey: String? = null
+    private var queueAutoAdvanceEnabled: Boolean = false
+    private var queueRepeatEnabled: Boolean = false
 
     private var presetEntries: List<SaberCommandResponseParser.PresetEntry> = emptyList()
     private var presetRows: List<SaberCommandResponseParser.PresetRow> = emptyList()
@@ -157,6 +165,7 @@ class MainActivity : AppCompatActivity() {
     private var trackVisualOptions: List<SaberCommandResponseParser.TrackVisualOption> = emptyList()
     private val expandedPresetHeaderIndices = linkedSetOf<Int>()
     private val expandedTrackHeaderKeys = linkedSetOf<String>()
+    private var trackMonitorJob: Job? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -188,6 +197,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        stopTrackMonitor()
         bleManager.close()
         super.onDestroy()
     }
@@ -385,6 +395,35 @@ class MainActivity : AppCompatActivity() {
                 launchBleTask { stopTrackInternal() }
             }
         }
+        pageBinding.buttonPlayTrackGroup.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { playSelectedTrackGroupInternal() }
+            }
+        }
+        pageBinding.buttonPreviousTrack.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { stepTrackQueueInternal(direction = -1) }
+            }
+        }
+        pageBinding.buttonTogglePauseTrack.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { toggleTrackPauseInternal() }
+            }
+        }
+        pageBinding.buttonNextTrack.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { stepTrackQueueInternal(direction = 1) }
+            }
+        }
+        pageBinding.buttonRepeatQueue.setOnClickListener {
+            queueRepeatEnabled = !queueRepeatEnabled
+            trackStatus = if (queueRepeatEnabled) {
+                "Repeat enabled for the active folder queue"
+            } else {
+                "Repeat disabled for the active folder queue"
+            }
+            renderAll()
+        }
         pageBinding.buttonRefreshVolume.setOnClickListener {
             runWithBlePermissions {
                 launchBleTask { refreshVolumeInternal() }
@@ -400,10 +439,12 @@ class MainActivity : AppCompatActivity() {
             val row = trackRows.getOrNull(position)
             when (row) {
                 is SaberCommandResponseParser.TrackRow.Header -> {
+                    selectedTrackHeaderKey = row.key
                     toggleTrackHeader(row.key)
                 }
                 is SaberCommandResponseParser.TrackRow.Track -> {
                     selectedTrackPath = row.path
+                    selectedTrackHeaderKey = SaberCommandResponseParser.deepestTrackHeaderKey(row.path)
                     renderAll()
                     runWithBlePermissions {
                         launchBleTask { playTrackInternal(row.path) }
@@ -581,6 +622,7 @@ class MainActivity : AppCompatActivity() {
                         renderAll()
 
                         if (state == ConnectionState.READY && previous != ConnectionState.READY) {
+                            ensureTrackMonitorRunning()
                             saberStatus = "Connected. Syncing saber data..."
                             trackStatus = "Connected. Syncing track data..."
                             visualsStatus = "Connected. Syncing track visual data..."
@@ -590,17 +632,23 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         if (state == ConnectionState.DISCONNECTED && previous != ConnectionState.DISCONNECTED) {
+                            stopTrackMonitor()
                             bladeState = null
                             nowPlaying = null
                             selectedTrackPath = null
+                            selectedTrackHeaderKey = null
                             currentPresetIndex = null
                             currentVolume = null
+                            trackPaused = null
                             presetEntries = emptyList()
                             presetRows = emptyList()
                             trackPaths = emptyList()
                             trackRows = emptyList()
                             expandedPresetHeaderIndices.clear()
                             expandedTrackHeaderKeys.clear()
+                            queueScopeHeaderKey = null
+                            queueAutoAdvanceEnabled = false
+                            queueRepeatEnabled = false
                             trackPolicy = null
                             trackSessionMode = null
                             trackVisualSelectedId = null
@@ -630,18 +678,50 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch { block() }
     }
 
+    private fun ensureTrackMonitorRunning() {
+        if (trackMonitorJob?.isActive == true) return
+        trackMonitorJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(2_500L)
+                if (currentConnectionState != ConnectionState.READY) continue
+                if (!queueAutoAdvanceEnabled || nowPlaying.isNullOrBlank() || trackPaused == true) continue
+
+                val previousTrack = nowPlaying
+                val result = runCommand(
+                    command = "gt",
+                    awaitResponse = true,
+                    successLog = false,
+                    logTraffic = false
+                )
+                if (!result.success) continue
+
+                val state = applyTrackRuntimeState(result.response)
+                if (previousTrack != null && state?.trackActive == false && state.trackPaused != true) {
+                    advanceQueuedTrackInternal(previousTrack)
+                }
+            }
+        }
+    }
+
+    private fun stopTrackMonitor() {
+        trackMonitorJob?.cancel()
+        trackMonitorJob = null
+    }
+
     private suspend fun runCommand(
         command: String,
         awaitResponse: Boolean = true,
         timeoutMs: Long = 3_000L,
         retries: Int = 1,
-        successLog: Boolean = awaitResponse
+        successLog: Boolean = awaitResponse,
+        logTraffic: Boolean = true
     ): SaberBleManager.CommandResult {
         val result = bleManager.sendCommand(
             command = command,
             awaitResponse = awaitResponse,
             timeoutMs = timeoutMs,
-            retries = retries
+            retries = retries,
+            logTraffic = logTraffic
         )
         if (!result.success) {
             appendLog("Command '${result.command}' failed: ${result.error ?: "unknown"}")
@@ -822,6 +902,14 @@ class MainActivity : AppCompatActivity() {
         if (selectedTrackPath !in trackPaths) {
             selectedTrackPath = nowPlaying?.takeIf(trackPaths::contains)
         }
+        val validHeaderKeys = SaberCommandResponseParser.allTrackHeaderKeys(trackPaths)
+        if (selectedTrackHeaderKey !in validHeaderKeys) {
+            selectedTrackHeaderKey = SaberCommandResponseParser.deepestTrackHeaderKey(selectedTrackPath ?: nowPlaying)
+        }
+        if (queueScopeHeaderKey !in validHeaderKeys) {
+            queueScopeHeaderKey = null
+            queueAutoAdvanceEnabled = false
+        }
         rebuildTrackRows(ensureCurrentTrackVisible = true)
         trackStatus = if (trackPaths.isEmpty()) {
             "No tracks returned by saber"
@@ -870,8 +958,16 @@ class MainActivity : AppCompatActivity() {
         renderAll()
     }
 
-    private suspend fun playTrackInternal(trackPath: String) {
+    private suspend fun playTrackInternal(
+        trackPath: String,
+        queueScopeKey: String? = selectedTrackHeaderKey ?: SaberCommandResponseParser.deepestTrackHeaderKey(trackPath),
+        enableAutoAdvance: Boolean = false
+    ) {
         selectedTrackPath = trackPath
+        selectedTrackHeaderKey = queueScopeKey ?: SaberCommandResponseParser.deepestTrackHeaderKey(trackPath)
+        queueScopeHeaderKey = selectedTrackHeaderKey
+        queueAutoAdvanceEnabled = enableAutoAdvance
+        trackPaused = false
         trackStatus = "Play requested: ${displayTrackName(trackPath)}"
         renderAll()
         val trackIndex = trackPaths.indexOf(trackPath)
@@ -886,10 +982,14 @@ class MainActivity : AppCompatActivity() {
             timeoutMs = 5_000L,
             successLog = false
         )
-        if (!result.success) return
+        if (!result.success) {
+            queueAutoAdvanceEnabled = false
+            return
+        }
 
         val immediateState = applyTrackRuntimeState(result.response)
         if (immediateState?.visualRejectedReason == "blade_on") {
+            queueAutoAdvanceEnabled = false
             trackStatus = "Music mode requires the blade to be off."
             renderAll()
             return
@@ -911,6 +1011,7 @@ class MainActivity : AppCompatActivity() {
         if (confirmation.success) {
             val confirmedState = applyTrackRuntimeState(confirmation.response)
             if (confirmedState?.visualRejectedReason == "blade_on") {
+                queueAutoAdvanceEnabled = false
                 trackStatus = "Music mode requires the blade to be off."
                 renderAll()
                 return
@@ -925,6 +1026,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun stopTrackInternal() {
+        queueAutoAdvanceEnabled = false
+        trackPaused = false
         trackStatus = "Stop requested"
         renderAll()
         val result = runCommand(
@@ -945,6 +1048,134 @@ class MainActivity : AppCompatActivity() {
             nowPlaying = null
         }
         trackStatus = if (nowPlaying == null) "Stopped" else "Still playing ${displayTrackName(nowPlaying)}"
+        renderAll()
+    }
+
+    private suspend fun playSelectedTrackGroupInternal() {
+        val scopeKey = resolveTrackQueueScopeKey()
+        val queue = queueTracksForScope(scopeKey)
+        if (scopeKey == null || queue.isEmpty()) {
+            trackStatus = "Select a folder/category or track first."
+            renderAll()
+            return
+        }
+
+        queueScopeHeaderKey = scopeKey
+        queueAutoAdvanceEnabled = true
+        val scopeLabel = displayTrackQueueScope(scopeKey)
+        val startTrack = when {
+            trackPaused == true && nowPlaying in queue -> nowPlaying
+            selectedTrackPath in queue -> selectedTrackPath
+            nowPlaying in queue -> nowPlaying
+            else -> queue.firstOrNull()
+        } ?: run {
+            trackStatus = "No playable tracks in $scopeLabel"
+            renderAll()
+            return
+        }
+
+        if (trackPaused == true && nowPlaying == startTrack) {
+            trackStatus = "Resuming $scopeLabel"
+            renderAll()
+            resumeTrackInternal()
+            return
+        }
+
+        if (nowPlaying == startTrack && trackPaused != true) {
+            trackStatus = "Queue armed for $scopeLabel"
+            renderAll()
+            return
+        }
+
+        trackStatus = "Playing $scopeLabel (${queue.size} tracks)"
+        renderAll()
+        playTrackInternal(startTrack, queueScopeKey = scopeKey, enableAutoAdvance = true)
+    }
+
+    private suspend fun stepTrackQueueInternal(direction: Int) {
+        val scopeKey = resolveTrackQueueScopeKey()
+        val queue = queueTracksForScope(scopeKey)
+        if (scopeKey == null || queue.isEmpty()) {
+            trackStatus = "Select a folder/category or track first."
+            renderAll()
+            return
+        }
+
+        val currentPath = nowPlaying ?: selectedTrackPath
+        val currentIndex = currentPath?.let(queue::indexOf) ?: -1
+        var targetIndex = currentIndex + direction
+        if (currentIndex < 0) {
+            targetIndex = if (direction >= 0) 0 else queue.lastIndex
+        }
+        if (targetIndex !in queue.indices) {
+            if (queueRepeatEnabled) {
+                targetIndex = if (direction >= 0) 0 else queue.lastIndex
+            } else {
+                trackStatus = if (direction >= 0) {
+                    "Reached end of ${displayTrackQueueScope(scopeKey)}"
+                } else {
+                    "Already at the first track in ${displayTrackQueueScope(scopeKey)}"
+                }
+                renderAll()
+                return
+            }
+        }
+
+        queueScopeHeaderKey = scopeKey
+        playTrackInternal(
+            trackPath = queue[targetIndex],
+            queueScopeKey = scopeKey,
+            enableAutoAdvance = true
+        )
+    }
+
+    private suspend fun toggleTrackPauseInternal() {
+        val scopeKey = resolveTrackQueueScopeKey()
+        if (nowPlaying == null && trackPaused != true) {
+            val fallbackTrack = selectedTrackPath ?: queueTracksForScope(scopeKey).firstOrNull()
+            if (fallbackTrack == null) {
+                trackStatus = "Select a track or folder to play."
+                renderAll()
+                return
+            }
+            playTrackInternal(
+                trackPath = fallbackTrack,
+                queueScopeKey = scopeKey,
+                enableAutoAdvance = queueAutoAdvanceEnabled
+            )
+            return
+        }
+
+        val result = runCommand(
+            command = "ttp",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        applyTrackRuntimeState(result.response)
+        trackStatus = when {
+            trackPaused == true -> "Paused ${displayTrackName(nowPlaying)}"
+            nowPlaying != null -> buildTrackStatus(nowPlaying)
+            else -> "Nothing playing"
+        }
+        renderAll()
+    }
+
+    private suspend fun resumeTrackInternal() {
+        val result = runCommand(
+            command = "trs",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        applyTrackRuntimeState(result.response)
+        trackStatus = if (nowPlaying != null) {
+            buildTrackStatus(nowPlaying)
+        } else {
+            "Nothing playing"
+        }
         renderAll()
     }
 
@@ -1193,22 +1424,65 @@ class MainActivity : AppCompatActivity() {
         } else {
             "${trackPaths.size} tracks"
         }
+        val selectedScopeKey = selectedTrackHeaderKey ?: queueScopeHeaderKey
+        pageBinding.textSelectedTrackGroupValue.text = displayTrackQueueScope(selectedScopeKey)
+        pageBinding.textSelectedTrackGroupValue.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (selectedScopeKey == null) R.color.app_text_secondary else R.color.app_primary
+            )
+        )
+        pageBinding.textQueueModeValue.text = when {
+            trackPaused == true && queueAutoAdvanceEnabled && queueRepeatEnabled -> "Paused | Queue + Repeat"
+            trackPaused == true && queueAutoAdvanceEnabled -> "Paused | Queue Active"
+            trackPaused == true -> "Paused"
+            queueAutoAdvanceEnabled && queueRepeatEnabled -> "Queue Active | Repeat"
+            queueAutoAdvanceEnabled -> "Queue Active"
+            queueRepeatEnabled -> "Repeat Armed"
+            else -> "Single Track"
+        }
 
         trackAdapter.items = trackRows
-        trackAdapter.selectedPosition = trackRows.indexOfFirst { row ->
+        val selectedTrackRowIndex = trackRows.indexOfFirst { row ->
             row is SaberCommandResponseParser.TrackRow.Track &&
                 row.path == (selectedTrackPath ?: nowPlaying)
         }
+        trackAdapter.selectedPosition = if (selectedTrackRowIndex >= 0) {
+            selectedTrackRowIndex
+        } else {
+            trackRows.indexOfFirst { row ->
+                row is SaberCommandResponseParser.TrackRow.Header &&
+                    row.key == selectedTrackHeaderKey
+            }
+        }
 
         val canInteract = currentConnectionState == ConnectionState.READY
+        val queueScopeKey = resolveTrackQueueScopeKey()
+        val queueTrackCount = queueTracksForScope(queueScopeKey).size
         pageBinding.buttonRefreshTracks.isEnabled = canInteract
         pageBinding.buttonRefreshNowPlaying.isEnabled = canInteract
-        pageBinding.buttonStopTrack.isEnabled = canInteract
+        pageBinding.buttonStopTrack.isEnabled = canInteract && (nowPlaying != null || trackPaused == true)
+        pageBinding.buttonPlayTrackGroup.isEnabled = canInteract && queueTrackCount > 0
+        pageBinding.buttonPreviousTrack.isEnabled = canInteract && queueTrackCount > 0
+        pageBinding.buttonTogglePauseTrack.isEnabled =
+            canInteract && (nowPlaying != null || trackPaused == true || selectedTrackPath != null)
+        pageBinding.buttonNextTrack.isEnabled = canInteract && queueTrackCount > 0
+        pageBinding.buttonRepeatQueue.isEnabled = canInteract && queueTrackCount > 0
         pageBinding.buttonExpandAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.buttonCollapseAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
         pageBinding.buttonRefreshVolume.isEnabled = canInteract
         pageBinding.seekVolume.isEnabled = canInteract
+        pageBinding.buttonTogglePauseTrack.text = if (trackPaused == true) {
+            getString(R.string.resume_track)
+        } else {
+            getString(R.string.play_pause_track)
+        }
+        pageBinding.buttonRepeatQueue.text = if (queueRepeatEnabled) {
+            getString(R.string.repeat_queue_on)
+        } else {
+            getString(R.string.repeat_queue_off)
+        }
         bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
     }
 
@@ -1448,10 +1722,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyTrackRuntimeState(response: String?) : SaberCommandResponseParser.TrackRuntimeState? {
         val state = SaberCommandResponseParser.parseTrackRuntimeState(response) ?: return null
-        if (state.trackActive == false) {
+        if (state.trackActive == false && state.trackPaused != true) {
             nowPlaying = null
         } else if (state.nowPlaying != null) {
             nowPlaying = state.nowPlaying
+        }
+        state.trackPaused?.let { trackPaused = it }
+        if (state.nowPlaying != null) {
+            selectedTrackPath = state.nowPlaying
+            if (selectedTrackHeaderKey == null) {
+                selectedTrackHeaderKey = SaberCommandResponseParser.deepestTrackHeaderKey(state.nowPlaying)
+            }
         }
         state.policy?.let { trackPolicy = it }
         state.sessionMode?.let { trackSessionMode = it }
@@ -1526,6 +1807,58 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun resolveTrackQueueScopeKey(): String? {
+        val preferredKeys = listOfNotNull(
+            selectedTrackHeaderKey,
+            queueScopeHeaderKey,
+            SaberCommandResponseParser.deepestTrackHeaderKey(activeTrackPath())
+        )
+        for (key in preferredKeys) {
+            if (queueTracksForScope(key).isNotEmpty()) {
+                return key
+            }
+        }
+        return null
+    }
+
+    private fun queueTracksForScope(scopeKey: String?): List<String> {
+        return SaberCommandResponseParser.tracksForHeader(trackPaths, scopeKey)
+    }
+
+    private suspend fun advanceQueuedTrackInternal(previousTrackPath: String) {
+        val scopeKey = queueScopeHeaderKey ?: resolveTrackQueueScopeKey()
+        val queue = queueTracksForScope(scopeKey)
+        if (scopeKey == null || queue.isEmpty()) {
+            queueAutoAdvanceEnabled = false
+            renderAll()
+            return
+        }
+
+        val currentIndex = queue.indexOf(previousTrackPath)
+        var nextIndex = currentIndex + 1
+        if (currentIndex < 0) {
+            nextIndex = 0
+        }
+        if (nextIndex !in queue.indices) {
+            if (queueRepeatEnabled) {
+                nextIndex = 0
+            } else {
+                queueAutoAdvanceEnabled = false
+                trackStatus = "Finished ${displayTrackQueueScope(scopeKey)}"
+                renderAll()
+                return
+            }
+        }
+
+        trackStatus = "Continuing ${displayTrackQueueScope(scopeKey)}"
+        renderAll()
+        playTrackInternal(
+            trackPath = queue[nextIndex],
+            queueScopeKey = scopeKey,
+            enableAutoAdvance = true
+        )
+    }
+
     private fun headerIndexForPreset(presetIndex: Int?): Int? {
         val targetIndex = presetIndex ?: return null
         var currentHeaderIndex: Int? = null
@@ -1542,7 +1875,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildTrackStatus(trackPath: String?): String {
-        val base = "Playing ${displayTrackName(trackPath)}"
+        val base = if (trackPaused == true) {
+            "Paused ${displayTrackName(trackPath)}"
+        } else {
+            "Playing ${displayTrackName(trackPath)}"
+        }
         return if (trackVisualActive == true && !trackVisualName.isNullOrBlank()) {
             "$base with $trackVisualName"
         } else {
@@ -1595,6 +1932,11 @@ class MainActivity : AppCompatActivity() {
     private fun displayTrackName(trackPath: String?): String {
         if (trackPath.isNullOrBlank()) return getString(R.string.state_none)
         return trackPath.substringAfterLast('/')
+    }
+
+    private fun displayTrackQueueScope(scopeKey: String?): String {
+        return SaberCommandResponseParser.trackHeaderLabel(scopeKey)
+            ?: getString(R.string.state_none)
     }
 
     private fun dp(value: Int): Int {

@@ -79,6 +79,7 @@ class SaberBleManager(
     @Volatile private var pendingResponse: CompletableDeferred<String>? = null
     @Volatile private var pendingWrite: CompletableDeferred<Int>? = null
     @Volatile private var maxWritePayloadBytes: Int = DEFAULT_WRITE_PAYLOAD_BYTES
+    @Volatile private var activeCommandLogTraffic: Boolean = true
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState = _connectionState.asStateFlow()
@@ -304,7 +305,8 @@ class SaberBleManager(
         command: String,
         awaitResponse: Boolean = true,
         timeoutMs: Long = 2_500L,
-        retries: Int = 1
+        retries: Int = 1,
+        logTraffic: Boolean = true
     ): CommandResult {
         val trimmed = command.trim()
         if (trimmed.isEmpty()) {
@@ -329,11 +331,15 @@ class SaberBleManager(
                 val attempt = index + 1
                 val responseLatch = if (awaitResponse) CompletableDeferred<String>() else null
                 pendingResponse = responseLatch
+                activeCommandLogTraffic = logTraffic
 
                 val writeOk = writeCommand("$trimmed\r\n")
                 if (!writeOk) {
                     pendingResponse = null
-                    log("Write failed for '$trimmed' attempt=$attempt")
+                    activeCommandLogTraffic = true
+                    if (logTraffic) {
+                        log("Write failed for '$trimmed' attempt=$attempt")
+                    }
                     return@withLock CommandResult(
                         command = trimmed,
                         success = false,
@@ -342,10 +348,13 @@ class SaberBleManager(
                     )
                 }
 
-                log("TX >> $trimmed")
+                if (logTraffic) {
+                    log("TX >> $trimmed")
+                }
 
                 if (responseLatch == null) {
                     pendingResponse = null
+                    activeCommandLogTraffic = true
                     return@withLock CommandResult(
                         command = trimmed,
                         success = true,
@@ -356,6 +365,7 @@ class SaberBleManager(
                 try {
                     val response = withTimeout(timeoutMs) { responseLatch.await() }
                     pendingResponse = null
+                    activeCommandLogTraffic = true
                     return@withLock CommandResult(
                         command = trimmed,
                         success = true,
@@ -364,10 +374,14 @@ class SaberBleManager(
                     )
                 } catch (_: TimeoutCancellationException) {
                     pendingResponse = null
-                    log("Timeout waiting for response to '$trimmed' attempt=$attempt")
+                    activeCommandLogTraffic = true
+                    if (logTraffic) {
+                        log("Timeout waiting for response to '$trimmed' attempt=$attempt")
+                    }
                 }
             }
 
+            activeCommandLogTraffic = true
             CommandResult(
                 command = trimmed,
                 success = false,
@@ -522,14 +536,18 @@ class SaberBleManager(
         val bytes = value ?: return
         if (bytes.isEmpty()) return
         val chunk = bytes.toString(StandardCharsets.UTF_8)
-        log("RX << ${escapeForLog(chunk)}")
+        if (activeCommandLogTraffic) {
+            log("RX << ${escapeForLog(chunk)}")
+        }
 
         val frames = parser.consume(chunk)
         if (frames.isEmpty()) return
 
         for (frame in frames) {
             _frames.tryEmit(frame)
-            log("FRAME << ${escapeForLog(frame)}")
+            if (activeCommandLogTraffic) {
+                log("FRAME << ${escapeForLog(frame)}")
+            }
             val waiter = pendingResponse
             if (waiter != null && !waiter.isCompleted) {
                 waiter.complete(frame)

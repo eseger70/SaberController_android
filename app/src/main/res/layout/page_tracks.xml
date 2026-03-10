@@ -60,6 +60,52 @@
                 android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                 android:textColor="@color/app_primary" />
 
+            <TextView
+                android:id="@+id/textSelectedTrackGroupLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/selected_track_group_label"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                android:textColor="@color/app_text_secondary" />
+
+            <TextView
+                android:id="@+id/textSelectedTrackGroupValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_value_panel"
+                android:paddingStart="14dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="12dp"
+                android:text="@string/state_none"
+                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                android:textColor="@color/app_primary" />
+
+            <TextView
+                android:id="@+id/textQueueModeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/queue_mode_label"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                android:textColor="@color/app_text_secondary" />
+
+            <TextView
+                android:id="@+id/textQueueModeValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_value_panel"
+                android:paddingStart="14dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="12dp"
+                android:text="@string/queue_mode_single_track"
+                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                android:textColor="@color/app_primary" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -90,6 +136,60 @@
                     app:cornerRadius="18dp" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonPlayTrackGroup"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="@string/play_track_group"
+                    android:textColor="@color/app_on_primary"
+                    app:backgroundTint="@color/app_secondary"
+                    app:cornerRadius="18dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonPreviousTrack"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/previous_track"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
+                    app:cornerRadius="18dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonTogglePauseTrack"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="@string/play_pause_track"
+                    android:textColor="@color/app_on_primary"
+                    app:backgroundTint="@color/app_primary"
+                    app:cornerRadius="18dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonNextTrack"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="@string/next_track"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
+                    app:cornerRadius="18dp" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonStopTrack"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
@@ -101,6 +201,17 @@
                     app:backgroundTint="@color/app_off_color"
                     app:cornerRadius="18dp" />
             </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonRepeatQueue"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/repeat_queue_off"
+                android:textColor="@color/app_text_primary"
+                app:backgroundTint="@color/app_surface_alt"
+                app:cornerRadius="18dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

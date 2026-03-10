@@ -11,6 +11,13 @@
     <string name="refresh_now_playing">Now Playing</string>
     <string name="refresh_volume">Refresh Volume</string>
     <string name="stop_track">Stop Track</string>
+    <string name="play_track_group">Play Folder</string>
+    <string name="previous_track">Previous</string>
+    <string name="play_pause_track">Play / Pause</string>
+    <string name="resume_track">Resume</string>
+    <string name="next_track">Next</string>
+    <string name="repeat_queue_off">Repeat Folder Off</string>
+    <string name="repeat_queue_on">Repeat Folder On</string>
     <string name="tab_saber">Saber</string>
     <string name="tab_tracks">Tracks</string>
     <string name="tab_styles">Visuals</string>
@@ -27,6 +34,8 @@
     <string name="track_status_label">Track status</string>
     <string name="effects_status_label">Effects status</string>
     <string name="now_playing_label">Now playing</string>
+    <string name="selected_track_group_label">Selected folder</string>
+    <string name="queue_mode_label">Queue mode</string>
     <string name="track_list_label">Track list</string>
     <string name="volume_label">Volume</string>
     <string name="volume_unknown">Unknown</string>
@@ -60,6 +69,7 @@
     <string name="raw_command_empty">Enter a command first</string>
     <string name="raw_command_requires_connection">Connect to the saber before sending raw commands</string>
     <string name="track_count_empty">0 tracks</string>
+    <string name="queue_mode_single_track">Single Track</string>
     <string name="track_visual_status_label">Track visual status</string>
     <string name="track_visual_status_default">Track visuals are firmware-driven and apply only when the selected playback mode allows them.</string>
     <string name="track_visual_hint">Auto preserves saber behavior while the blade is on and uses the selected music visual while the blade is off. Saber always preserves the active saber state. Music requires the blade to be off and rejects playback when the blade is already on.</string>

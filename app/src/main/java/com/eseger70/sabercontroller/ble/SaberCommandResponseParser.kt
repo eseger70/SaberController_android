@@ -1,6 +1,22 @@
 package com.eseger70.sabercontroller.ble
 
 object SaberCommandResponseParser {
+    data class TrackVisualOption(
+        val id: Int,
+        val name: String
+    )
+
+    data class TrackRuntimeState(
+        val nowPlaying: String? = null,
+        val trackActive: Boolean? = null,
+        val policy: String? = null,
+        val sessionMode: String? = null,
+        val visualSelectedId: Int? = null,
+        val visualName: String? = null,
+        val visualActive: Boolean? = null,
+        val visualRejectedReason: String? = null
+    )
+
     data class PresetEntry(
         val index: Int,
         val name: String,
@@ -201,6 +217,62 @@ object SaberCommandResponseParser {
         }
     }
 
+    fun parseTrackVisualOptions(response: String?): List<TrackVisualOption> {
+        if (response.isNullOrBlank()) return emptyList()
+
+        return response
+            .lineSequence()
+            .map { it.trim() }
+            .mapNotNull { line ->
+                if (!line.startsWith("TRACK_VISUAL=")) return@mapNotNull null
+                val payload = line.substringAfter("TRACK_VISUAL=", "").trim()
+                val idText = payload.substringBefore('|', "").trim()
+                val id = idText.toIntOrNull() ?: return@mapNotNull null
+                val name = payload.substringAfter('|', "").trim().ifBlank { "Visual $id" }
+                TrackVisualOption(id = id, name = name)
+            }
+            .distinctBy { it.id }
+            .toList()
+    }
+
+    fun parseTrackRuntimeState(response: String?): TrackRuntimeState? {
+        if (response.isNullOrBlank()) return null
+
+        val fields = parseFieldMap(response)
+        val nowPlaying = parseNowPlaying(response)
+        val trackActive = fields["TRACK_ACTIVE"]?.toBooleanFlag()
+        val policy = fields["TRACK_POLICY"]?.ifBlank { null }
+        val sessionMode = fields["TRACK_SESSION_MODE"]?.ifBlank { null }
+        val visualSelectedId = fields["TRACK_VISUAL_SELECTED"]?.toIntOrNull()
+        val visualName = fields["TRACK_VISUAL_NAME"]?.ifBlank { null }
+        val visualActive = fields["TRACK_VISUAL_ACTIVE"]?.toBooleanFlag()
+        val visualRejectedReason = fields["TRACK_VISUAL_REJECTED"]?.ifBlank { null }
+
+        if (
+            nowPlaying == null &&
+            trackActive == null &&
+            policy == null &&
+            sessionMode == null &&
+            visualSelectedId == null &&
+            visualName == null &&
+            visualActive == null &&
+            visualRejectedReason == null
+        ) {
+            return null
+        }
+
+        return TrackRuntimeState(
+            nowPlaying = nowPlaying,
+            trackActive = trackActive,
+            policy = policy,
+            sessionMode = sessionMode,
+            visualSelectedId = visualSelectedId,
+            visualName = visualName,
+            visualActive = visualActive,
+            visualRejectedReason = visualRejectedReason
+        )
+    }
+
     private fun parseQuotedValue(line: String): String? {
         val rawValue = line.substringAfter('=', "")
             .trim()
@@ -233,6 +305,28 @@ object SaberCommandResponseParser {
     private fun String.isTrackPath(): Boolean {
         return contains(".wav", ignoreCase = true) &&
             !startsWith("Playing ", ignoreCase = true)
+    }
+
+    private fun parseFieldMap(response: String): Map<String, String> {
+        return response
+            .lineSequence()
+            .map { it.trim() }
+            .mapNotNull { line ->
+                val delimiterIndex = line.indexOf('=')
+                if (delimiterIndex <= 0) return@mapNotNull null
+                val key = line.substring(0, delimiterIndex).trim()
+                val value = line.substring(delimiterIndex + 1).trim()
+                if (key.isEmpty()) null else key to value
+            }
+            .toMap()
+    }
+
+    private fun String.toBooleanFlag(): Boolean? {
+        return when (trim()) {
+            "1" -> true
+            "0" -> false
+            else -> null
+        }
     }
 
     private const val HEADER_PREFIX = "_sub_"

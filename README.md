@@ -18,10 +18,10 @@ Android BLE controller app for ProffieOS-based saber control.
 - Stop playback with `stop_track`
 - Query now-playing with `get_track`
 - Parse framed output across fragmented BLE packets
-- Show a two-tab UI with shared connection/log state
+- Show a multi-tab UI with shared connection/log state
 - Show grouped preset headers using the `_sub_` naming convention
 - Show a grouped track list with tap-to-play flow
-- Auto-apply preset mappings for track, album, category, or default playback rules
+- Control firmware-backed track playback modes and track visuals
 - Send arbitrary raw BLE commands from the `Log` tab for firmware testing
 
 ## BLE Protocol
@@ -52,6 +52,12 @@ Supported app commands:
   - `pt <index>`
   - `st`
   - `gt`
+  - `tvl`
+  - `tvg`
+  - `tvs <id>`
+  - `tvc`
+  - `tpg`
+  - `tps <auto|preserve|visual>`
   - `cl`, `sb`, `fo`, `bt`, `lk`, `dg`, `lb`, `mt`
 
 ## Build / Run
@@ -106,10 +112,11 @@ The app mirrors its in-app log panel to logcat under these tags:
     - tap a track row to play it
     - use `Now Playing` and `Stop Track` as needed
     - use the volume refresh button or slider
-6. On the `Styles` tab:
-   - select a preset on the `Saber` tab
-   - bind that preset to the selected track, its album, its category, or the default fallback
-   - track playback will resolve mappings in this order: track, album, category, default
+6. On the `Visuals` tab:
+   - choose playback mode: `Auto`, `Saber`, or `Music`
+   - refresh the firmware-defined track visual list
+   - select a track visual and apply or clear it
+   - review the current mode, selected visual, runtime state, and current track
 7. Inspect the shared log panel for `TX`, `RX`, and framed responses.
 8. On the `Log` tab, use the raw command box to send firmware commands such as `tpg`, `tvg`, `tvl`, `tvs 1`, or `tps auto`.
 
@@ -119,7 +126,9 @@ The app mirrors its in-app log panel to logcat under these tags:
 - The parser is resilient to notification packet fragmentation.
 - Command sending uses a serialized command lock with timeout/retry behavior for awaited responses.
 - Track browsing is currently path-based because the current firmware command surface is path-based.
-- Track style associations are implemented app-side as preset mappings. The app applies `set_preset <index>` before playback when a matching rule exists.
+- Track visuals are implemented firmware-side. The app no longer switches presets before playback.
+- `Auto` preserves saber behavior while the blade is on and uses the selected track visual while the blade is off.
+- `Music` requires the blade to be off. If the blade is on, playback is rejected with `TRACK_VISUAL_REJECTED=blade_on`.
 - Presets whose names start with `_sub_` are treated as non-selectable category headers in the UI.
 - If a header preset is currently selected, the app blocks ignition until a real preset is chosen.
 - The `Log` tab raw command console uses the same BLE transport and framed response parsing as the rest of the app, so it is the preferred surface for testing new firmware commands before dedicated UI is added.

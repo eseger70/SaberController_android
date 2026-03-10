@@ -156,4 +156,66 @@ class SaberCommandResponseParserTest {
             result
         )
     }
+
+    @Test
+    fun parseTrackVisualOptionsReadsIdsAndNames() {
+        val result = SaberCommandResponseParser.parseTrackVisualOptions(
+            """
+            TRACK_VISUAL=0|None
+            TRACK_VISUAL=1|Pulse Amber
+            TRACK_VISUAL=2|Blue Pulse
+            """.trimIndent()
+        )
+
+        assertEquals(
+            listOf(
+                SaberCommandResponseParser.TrackVisualOption(0, "None"),
+                SaberCommandResponseParser.TrackVisualOption(1, "Pulse Amber"),
+                SaberCommandResponseParser.TrackVisualOption(2, "Blue Pulse")
+            ),
+            result
+        )
+    }
+
+    @Test
+    fun parseTrackRuntimeStateReadsPolicyAndVisualFields() {
+        val result = SaberCommandResponseParser.parseTrackRuntimeState(
+            """
+            Playing tracks/mars.wav
+            TRACK_ACTIVE=1
+            TRACK_POLICY=auto
+            TRACK_SESSION_MODE=visual
+            TRACK_VISUAL_SELECTED=1
+            TRACK_VISUAL_NAME=Pulse Amber
+            TRACK_VISUAL_ACTIVE=1
+            """.trimIndent()
+        )
+
+        assertEquals("tracks/mars.wav", result?.nowPlaying)
+        assertEquals(true, result?.trackActive)
+        assertEquals("auto", result?.policy)
+        assertEquals("visual", result?.sessionMode)
+        assertEquals(1, result?.visualSelectedId)
+        assertEquals("Pulse Amber", result?.visualName)
+        assertEquals(true, result?.visualActive)
+    }
+
+    @Test
+    fun parseTrackRuntimeStateReadsVisualRejection() {
+        val result = SaberCommandResponseParser.parseTrackRuntimeState(
+            """
+            TRACK_VISUAL_REJECTED=blade_on
+            TRACK_POLICY=visual
+            TRACK_SESSION_MODE=none
+            TRACK_VISUAL_SELECTED=1
+            TRACK_VISUAL_NAME=Pulse Amber
+            TRACK_VISUAL_ACTIVE=0
+            """.trimIndent()
+        )
+
+        assertEquals("blade_on", result?.visualRejectedReason)
+        assertEquals("visual", result?.policy)
+        assertEquals("none", result?.sessionMode)
+        assertEquals(false, result?.visualActive)
+    }
 }

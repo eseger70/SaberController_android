@@ -29,7 +29,7 @@
                     android:id="@+id/textStylesStatusLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/styles_status_label"
+                    android:text="@string/track_visual_status_label"
                     android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                     android:textColor="@color/app_text_secondary" />
 
@@ -38,7 +38,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="@string/styles_status_default"
+                    android:text="@string/track_visual_status_default"
                     android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                     android:textColor="@color/app_text_primary" />
 
@@ -47,80 +47,76 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="@string/styles_hint"
+                    android:text="@string/track_visual_hint"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                     android:textColor="@color/app_text_secondary" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="14dp"
                     android:orientation="vertical">
 
                     <TextView
-                        android:id="@+id/textSelectedTrackLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/selected_track_label"
+                        android:text="@string/track_visual_policy_label"
                         android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
                         android:textColor="@color/app_text_secondary" />
 
                     <TextView
-                        android:id="@+id/textSelectedTrackValue"
+                        android:id="@+id/textTrackVisualPolicyValue"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
+                        android:text="@string/state_unknown"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textColor="@color/app_text_primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/track_visual_selected_label"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                        android:textColor="@color/app_text_secondary" />
+
+                    <TextView
+                        android:id="@+id/textTrackVisualSelectionValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/track_visual_none"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textColor="@color/app_primary" />
 
                     <TextView
-                        android:id="@+id/textSelectedCategoryLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="@string/selected_category_label"
+                        android:text="@string/track_visual_runtime_label"
                         android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
                         android:textColor="@color/app_text_secondary" />
 
                     <TextView
-                        android:id="@+id/textSelectedCategoryValue"
+                        android:id="@+id/textTrackVisualRuntimeValue"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
+                        android:text="@string/state_unknown"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textColor="@color/app_text_primary" />
 
                     <TextView
-                        android:id="@+id/textSelectedAlbumLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="@string/selected_album_label"
+                        android:text="@string/track_visual_track_label"
                         android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
                         android:textColor="@color/app_text_secondary" />
 
                     <TextView
-                        android:id="@+id/textSelectedAlbumValue"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@color/app_text_primary" />
-
-                    <TextView
-                        android:id="@+id/textResolvedPresetLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/resolved_preset_label"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                        android:textColor="@color/app_text_secondary" />
-
-                    <TextView
-                        android:id="@+id/textResolvedPresetValue"
+                        android:id="@+id/textTrackVisualTrackValue"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
@@ -150,7 +146,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/styles_rules_label"
+                    android:text="@string/track_visual_policy_title"
                     android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                     android:textColor="@color/app_text_secondary" />
 
@@ -158,234 +154,129 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="@string/styles_rules_hint"
+                    android:text="@string/track_visual_policy_hint"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                     android:textColor="@color/app_text_secondary" />
 
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/toggleTrackPolicy"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonPolicyAuto"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/track_policy_auto" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonPolicySaber"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/track_policy_preserve" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonPolicyMusic"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/track_policy_visual" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/app_surface"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/app_outline"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/mapping_default_label"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                        android:layout_weight="1"
+                        android:text="@string/track_visual_picker_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                         android:textColor="@color/app_text_secondary" />
 
-                    <TextView
-                        android:id="@+id/textDefaultMappingValue"
-                        android:layout_width="match_parent"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonRefreshTrackVisuals"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@color/app_text_primary" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonSetDefaultMapping"
-                            style="@style/Widget.Material3.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/use_current_preset"
-                            android:textColor="@color/app_on_primary"
-                            app:backgroundTint="@color/app_primary"
-                            app:cornerRadius="18dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonClearDefaultMapping"
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:text="@string/clear_mapping"
-                            android:textColor="@color/app_text_primary"
-                            app:backgroundTint="@color/app_surface_alt"
-                            app:cornerRadius="18dp" />
-                    </LinearLayout>
+                        android:text="@string/refresh_visuals"
+                        android:textColor="@color/app_text_primary"
+                        app:backgroundTint="@color/app_surface_alt"
+                        app:cornerRadius="18dp" />
                 </LinearLayout>
 
-                <View
+                <TextView
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="14dp"
-                    android:background="@color/app_outline" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/track_visual_picker_hint"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="@color/app_text_secondary" />
+
+                <Spinner
+                    android:id="@+id/spinnerTrackVisuals"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="@color/app_outline" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="vertical">
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
 
-                    <TextView
-                        android:layout_width="match_parent"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonApplyTrackVisual"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/mapping_category_label"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                        android:textColor="@color/app_text_secondary" />
+                        android:layout_weight="1"
+                        android:text="@string/apply_visual"
+                        android:textColor="@color/app_on_primary"
+                        app:backgroundTint="@color/app_primary"
+                        app:cornerRadius="18dp" />
 
-                    <TextView
-                        android:id="@+id/textCategoryMappingValue"
-                        android:layout_width="match_parent"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonClearTrackVisual"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@color/app_text_primary" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonSetCategoryMapping"
-                            style="@style/Widget.Material3.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/use_current_preset"
-                            android:textColor="@color/app_on_primary"
-                            app:backgroundTint="@color/app_primary"
-                            app:cornerRadius="18dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonClearCategoryMapping"
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:text="@string/clear_mapping"
-                            android:textColor="@color/app_text_primary"
-                            app:backgroundTint="@color/app_surface_alt"
-                            app:cornerRadius="18dp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="14dp"
-                    android:background="@color/app_outline" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/mapping_album_label"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                        android:textColor="@color/app_text_secondary" />
-
-                    <TextView
-                        android:id="@+id/textAlbumMappingValue"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@color/app_text_primary" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonSetAlbumMapping"
-                            style="@style/Widget.Material3.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/use_current_preset"
-                            android:textColor="@color/app_on_primary"
-                            app:backgroundTint="@color/app_primary"
-                            app:cornerRadius="18dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonClearAlbumMapping"
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:text="@string/clear_mapping"
-                            android:textColor="@color/app_text_primary"
-                            app:backgroundTint="@color/app_surface_alt"
-                            app:cornerRadius="18dp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="14dp"
-                    android:background="@color/app_outline" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/mapping_track_label"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                        android:textColor="@color/app_text_secondary" />
-
-                    <TextView
-                        android:id="@+id/textTrackMappingValue"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/state_none"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@color/app_text_primary" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonSetTrackMapping"
-                            style="@style/Widget.Material3.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/use_current_preset"
-                            android:textColor="@color/app_on_primary"
-                            app:backgroundTint="@color/app_primary"
-                            app:cornerRadius="18dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonClearTrackMapping"
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:text="@string/clear_mapping"
-                            android:textColor="@color/app_text_primary"
-                            app:backgroundTint="@color/app_surface_alt"
-                            app:cornerRadius="18dp" />
-                    </LinearLayout>
+                        android:layout_marginStart="10dp"
+                        android:text="@string/clear_visual"
+                        android:textColor="@color/app_text_primary"
+                        app:backgroundTint="@color/app_surface_alt"
+                        app:cornerRadius="18dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

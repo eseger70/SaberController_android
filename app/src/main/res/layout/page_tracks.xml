@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="@color/app_surface_alt"
-        app:cardCornerRadius="24dp"
+        app:cardCornerRadius="20dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/app_outline"
         app:strokeWidth="1dp">
@@ -18,52 +18,43 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:id="@+id/textTrackStatusLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/track_status_label"
-                android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                android:textColor="@color/app_text_secondary" />
+            android:padding="10dp">
 
             <TextView
                 android:id="@+id/textTrackStatusValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_chip_neutral"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingStart="12dp"
+                android:paddingTop="7dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="7dp"
                 android:text="@string/state_unknown"
-                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                android:textColor="@color/app_text_primary" />
-
-            <TextView
-                android:id="@+id/textNowPlayingLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/now_playing_label"
                 android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                android:textColor="@color/app_text_secondary" />
+                android:textColor="@color/app_header_text" />
 
             <TextView
                 android:id="@+id/textNowPlayingValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_value_panel"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:paddingStart="12dp"
-                android:paddingTop="10dp"
+                android:paddingTop="8dp"
                 android:paddingEnd="12dp"
-                android:paddingBottom="10dp"
+                android:paddingBottom="8dp"
                 android:text="@string/state_none"
-                android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                 android:textColor="@color/app_primary" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <TextView
@@ -74,35 +65,35 @@
                     android:background="@drawable/bg_chip_neutral"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:paddingStart="12dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="8dp"
+                    android:paddingStart="10dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="7dp"
                     android:text="@string/state_none"
-                    android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                     android:textColor="@color/app_header_text" />
 
                 <TextView
                     android:id="@+id/textQueueModeValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:background="@drawable/bg_chip_neutral"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:paddingStart="12dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="8dp"
+                    android:paddingStart="10dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="7dp"
                     android:text="@string/queue_mode_single_track"
-                    android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                     android:textColor="@color/app_header_text" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
@@ -111,40 +102,43 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/refresh_tracks"
                     android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_primary"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonRefreshNowPlaying"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/refresh_now_playing"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonPlayTrackGroup"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/play_track_group"
                     android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_secondary"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
@@ -153,46 +147,50 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/previous_track"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonTogglePauseTrack"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/play_pause_track"
                     android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_primary"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonNextTrack"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/next_track"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonStopTrack"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/stop_track"
                     android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_off_color"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
             </LinearLayout>
 
         </LinearLayout>
@@ -201,10 +199,10 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
         android:layout_weight="1"
         app:cardBackgroundColor="@color/app_surface"
-        app:cardCornerRadius="24dp"
+        app:cardCornerRadius="20dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/app_outline"
         app:strokeWidth="1dp">
@@ -213,7 +211,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:padding="10dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -236,10 +234,10 @@
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_chip_neutral"
                     android:gravity="center"
-                    android:paddingStart="12dp"
-                    android:paddingTop="6dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="6dp"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
                     android:text="@string/track_count_empty"
                     android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                     android:textColor="@color/app_header_text" />
@@ -248,7 +246,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
@@ -257,41 +255,44 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:minHeight="38dp"
                     android:text="@string/expand_all_tracks"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="16dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonCollapseAllTracks"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="38dp"
                     android:text="@string/collapse_all_tracks"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="16dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonRepeatQueue"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="38dp"
                     android:text="@string/repeat_queue_off"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="16dp" />
+                    app:cornerRadius="14dp" />
             </LinearLayout>
 
             <ListView
                 android:id="@+id/listTracks"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:layout_weight="1"
                 android:divider="@null"
                 android:dividerHeight="0dp"
@@ -303,9 +304,9 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
         app:cardBackgroundColor="@color/app_surface"
-        app:cardCornerRadius="24dp"
+        app:cardCornerRadius="20dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/app_outline"
         app:strokeWidth="1dp">
@@ -314,7 +315,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:paddingStart="10dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -334,10 +338,10 @@
                     android:id="@+id/textVolumeValue"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:text="@string/volume_unknown"
-                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                     android:textColor="@color/app_primary" />
 
                 <com.google.android.material.button.MaterialButton
@@ -345,17 +349,18 @@
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minHeight="36dp"
                     android:text="@string/refresh_volume"
                     android:textColor="@color/app_text_primary"
                     app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="16dp" />
+                    app:cornerRadius="14dp" />
             </LinearLayout>
 
             <SeekBar
                 android:id="@+id/seekVolume"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="0dp"
                 android:max="2000"
                 android:progressTint="@color/app_secondary"
                 android:thumbTint="@color/app_secondary" />

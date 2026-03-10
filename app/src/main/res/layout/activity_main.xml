@@ -6,13 +6,13 @@
     android:background="@drawable/bg_app_shell"
     android:clipToPadding="false"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="8dp">
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="@color/app_surface"
-        app:cardCornerRadius="28dp"
+        app:cardCornerRadius="20dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/app_outline"
         app:strokeWidth="1dp">
@@ -21,7 +21,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="10dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -36,30 +36,12 @@
                     android:orientation="vertical">
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:letterSpacing="0.08"
-                        android:text="@string/app_name"
-                        android:textAllCaps="true"
-                        android:textColor="@color/app_text_secondary"
-                        android:textSize="12sp" />
-
-                    <TextView
                         android:id="@+id/textConnectionStateLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="@string/connection_state_label"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:text="@string/app_name"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                         android:textColor="@color/app_text_primary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/app_subtitle"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="@color/app_text_secondary" />
                 </LinearLayout>
 
                 <TextView
@@ -68,20 +50,20 @@
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_chip_neutral"
                     android:gravity="center"
-                    android:minWidth="96dp"
-                    android:paddingStart="14dp"
-                    android:paddingTop="10dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="10dp"
+                    android:minWidth="76dp"
+                    android:paddingStart="10dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="6dp"
                     android:text="@string/state_disconnected"
-                    android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
                     android:textColor="@color/app_header_text" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
@@ -90,21 +72,23 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/connect"
                     android:textColor="@color/app_on_primary"
                     app:backgroundTint="@color/app_primary"
-                    app:cornerRadius="18dp" />
+                    app:cornerRadius="14dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonDisconnect"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
+                    android:minHeight="40dp"
                     android:text="@string/disconnect"
                     android:textColor="@color/app_text_primary"
-                    app:cornerRadius="18dp"
+                    app:cornerRadius="14dp"
                     app:strokeColor="@color/app_outline" />
             </LinearLayout>
         </LinearLayout>
@@ -113,9 +97,9 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="8dp"
         app:cardBackgroundColor="@color/app_surface_alt"
-        app:cardCornerRadius="22dp"
+        app:cardCornerRadius="18dp"
         app:cardElevation="0dp"
         app:strokeColor="@color/app_outline"
         app:strokeWidth="1dp">
@@ -125,7 +109,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/app_surface_alt"
-            android:padding="6dp"
+            android:padding="2dp"
             app:tabIndicatorAnimationMode="elastic"
             app:tabIndicatorColor="@android:color/transparent"
             app:tabIndicatorFullWidth="false"
@@ -140,7 +124,7 @@
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="6dp"
         android:layout_weight="1" />
 
 </LinearLayout>

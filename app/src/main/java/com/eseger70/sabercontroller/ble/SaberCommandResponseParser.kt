@@ -67,10 +67,17 @@ object SaberCommandResponseParser {
         abstract val label: String
 
         data class Header(
+            val key: String,
             val title: String,
-            override val level: Int
+            override val level: Int,
+            val expanded: Boolean,
+            val childCount: Int
         ) : TrackRow() {
-            override val label: String = title
+            override val label: String = if (childCount > 0) {
+                "${if (expanded) "[-]" else "[+]"} $title ($childCount)"
+            } else {
+                title
+            }
         }
 
         data class Track(
@@ -194,44 +201,111 @@ object SaberCommandResponseParser {
             .toList()
     }
 
-    fun buildTrackRows(trackPaths: List<String>): List<TrackRow> {
+    fun buildTrackRows(
+        trackPaths: List<String>,
+        expandedHeaderKeys: Set<String> = emptySet()
+    ): List<TrackRow> {
         if (trackPaths.isEmpty()) return emptyList()
 
-        val rows = mutableListOf<TrackRow>()
-        var previousDirectories: List<String> = emptyList()
-        var emittedRootHeader = false
+        var rootTrackCount = 0
+        val descendantCountByHeader = mutableMapOf<String, Int>()
         for (path in trackPaths) {
             val segments = visibleTrackSegments(path)
             if (segments.isEmpty()) continue
 
             val directories = segments.dropLast(1)
             if (directories.isEmpty()) {
-                if (!emittedRootHeader || previousDirectories.isNotEmpty()) {
-                    rows.add(TrackRow.Header(title = "Tracks", level = 0))
-                    emittedRootHeader = true
-                }
-            } else {
-                emittedRootHeader = false
-                val sharedDepth = sharedPrefixLength(previousDirectories, directories)
-                for (index in sharedDepth until directories.size) {
+                rootTrackCount += 1
+            }
+            val keySegments = mutableListOf<String>()
+            for (directory in directories) {
+                keySegments += directory
+                val key = keySegments.joinToString("/")
+                descendantCountByHeader[key] = (descendantCountByHeader[key] ?: 0) + 1
+            }
+        }
+
+        val rows = mutableListOf<TrackRow>()
+        var emittedRootHeader = false
+        val emittedHeaders = mutableSetOf<String>()
+        for (path in trackPaths) {
+            val segments = visibleTrackSegments(path)
+            if (segments.isEmpty()) continue
+
+            val directories = segments.dropLast(1)
+            if (directories.isEmpty()) {
+                if (!emittedRootHeader) {
                     rows.add(
                         TrackRow.Header(
-                            title = displayDirectoryName(directories[index]),
-                            level = index
+                            key = ROOT_TRACKS_HEADER_KEY,
+                            title = "Tracks",
+                            level = 0,
+                            expanded = expandedHeaderKeys.contains(ROOT_TRACKS_HEADER_KEY),
+                            childCount = rootTrackCount
+                        )
+                    )
+                    emittedRootHeader = true
+                }
+                if (expandedHeaderKeys.contains(ROOT_TRACKS_HEADER_KEY)) {
+                    rows.add(
+                        TrackRow.Track(
+                            path = path,
+                            displayName = path.substringAfterLast('/'),
+                            level = 1
+                        )
+                    )
+                }
+            } else {
+                var parentExpanded = true
+                val keySegments = mutableListOf<String>()
+                for ((index, directory) in directories.withIndex()) {
+                    keySegments += directory
+                    val key = keySegments.joinToString("/")
+                    if (parentExpanded && emittedHeaders.add(key)) {
+                        rows.add(
+                            TrackRow.Header(
+                                key = key,
+                                title = displayDirectoryName(directory),
+                                level = index,
+                                expanded = expandedHeaderKeys.contains(key),
+                                childCount = descendantCountByHeader[key] ?: 0
+                            )
+                        )
+                    }
+                    parentExpanded = parentExpanded && expandedHeaderKeys.contains(key)
+                }
+                if (parentExpanded) {
+                    rows.add(
+                        TrackRow.Track(
+                            path = path,
+                            displayName = path.substringAfterLast('/'),
+                            level = directories.size
                         )
                     )
                 }
             }
-            rows.add(
-                TrackRow.Track(
-                    path = path,
-                    displayName = path.substringAfterLast('/'),
-                    level = directories.size
-                )
-            )
-            previousDirectories = directories
         }
         return rows
+    }
+
+    fun trackHeaderKeysForPath(trackPath: String?): List<String> {
+        if (trackPath.isNullOrBlank()) return emptyList()
+
+        val segments = visibleTrackSegments(trackPath)
+        if (segments.isEmpty()) return emptyList()
+
+        val directories = segments.dropLast(1)
+        if (directories.isEmpty()) {
+            return listOf(ROOT_TRACKS_HEADER_KEY)
+        }
+
+        val keys = mutableListOf<String>()
+        val keySegments = mutableListOf<String>()
+        for (directory in directories) {
+            keySegments += directory
+            keys += keySegments.joinToString("/")
+        }
+        return keys
     }
 
     fun parseNowPlaying(response: String?): String? {
@@ -335,16 +409,6 @@ object SaberCommandResponseParser {
             .filterNot { it.equals("tracks", ignoreCase = true) }
     }
 
-    private fun sharedPrefixLength(first: List<String>, second: List<String>): Int {
-        val max = minOf(first.size, second.size)
-        for (index in 0 until max) {
-            if (!first[index].equals(second[index], ignoreCase = true)) {
-                return index
-            }
-        }
-        return max
-    }
-
     private fun displayDirectoryName(raw: String): String {
         return raw.replace('_', ' ').ifBlank { raw }
     }
@@ -376,5 +440,6 @@ object SaberCommandResponseParser {
         }
     }
 
+    private const val ROOT_TRACKS_HEADER_KEY = "__root_tracks__"
     private const val HEADER_PREFIX = "_sub_"
 }

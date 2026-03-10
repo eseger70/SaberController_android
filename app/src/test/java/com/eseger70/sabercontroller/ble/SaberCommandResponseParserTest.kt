@@ -133,7 +133,7 @@ class SaberCommandResponseParserTest {
     }
 
     @Test
-    fun buildTrackRowsBuildsNestedHierarchy() {
+    fun buildTrackRowsCollapsesFoldersByDefault() {
         val result = SaberCommandResponseParser.buildTrackRows(
             listOf(
                 "tracks/mars.wav",
@@ -145,10 +145,68 @@ class SaberCommandResponseParserTest {
 
         assertEquals(
             listOf(
-                SaberCommandResponseParser.TrackRow.Header("Tracks", 0),
-                SaberCommandResponseParser.TrackRow.Track("tracks/mars.wav", "mars.wav", 0),
-                SaberCommandResponseParser.TrackRow.Header("Christmas", 0),
-                SaberCommandResponseParser.TrackRow.Header("album a", 1),
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "__root_tracks__",
+                    title = "Tracks",
+                    level = 0,
+                    expanded = false,
+                    childCount = 1
+                ),
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "Christmas",
+                    title = "Christmas",
+                    level = 0,
+                    expanded = false,
+                    childCount = 2
+                ),
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "Artist_1",
+                    title = "Artist 1",
+                    level = 0,
+                    expanded = false,
+                    childCount = 1
+                )
+            ),
+            result
+        )
+    }
+
+    @Test
+    fun buildTrackRowsExpandsNestedFolders() {
+        val result = SaberCommandResponseParser.buildTrackRows(
+            trackPaths = listOf(
+                "tracks/mars.wav",
+                "tracks/Christmas/album_a/song_1.wav",
+                "tracks/Christmas/album_a/song_2.wav",
+                "Artist_1/tracks/album_d/song_3.wav"
+            ),
+            expandedHeaderKeys = setOf("__root_tracks__", "Christmas", "Christmas/album_a")
+        )
+
+        assertEquals(
+            listOf(
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "__root_tracks__",
+                    title = "Tracks",
+                    level = 0,
+                    expanded = true,
+                    childCount = 1
+                ),
+                SaberCommandResponseParser.TrackRow.Track("tracks/mars.wav", "mars.wav", 1),
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "Christmas",
+                    title = "Christmas",
+                    level = 0,
+                    expanded = true,
+                    childCount = 2
+                ),
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "Christmas/album_a",
+                    title = "album a",
+                    level = 1,
+                    expanded = true,
+                    childCount = 2
+                ),
                 SaberCommandResponseParser.TrackRow.Track(
                     "tracks/Christmas/album_a/song_1.wav",
                     "song_1.wav",
@@ -159,12 +217,12 @@ class SaberCommandResponseParserTest {
                     "song_2.wav",
                     2
                 ),
-                SaberCommandResponseParser.TrackRow.Header("Artist 1", 0),
-                SaberCommandResponseParser.TrackRow.Header("album d", 1),
-                SaberCommandResponseParser.TrackRow.Track(
-                    "Artist_1/tracks/album_d/song_3.wav",
-                    "song_3.wav",
-                    2
+                SaberCommandResponseParser.TrackRow.Header(
+                    key = "Artist_1",
+                    title = "Artist 1",
+                    level = 0,
+                    expanded = false,
+                    childCount = 1
                 )
             ),
             result

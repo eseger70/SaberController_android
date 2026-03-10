@@ -94,7 +94,10 @@ class MainActivity : AppCompatActivity() {
             context = this,
             labelProvider = { row -> row.label },
             headerProvider = { row -> row is SaberCommandResponseParser.TrackRow.Header },
-            enabledProvider = { row -> row is SaberCommandResponseParser.TrackRow.Track },
+            enabledProvider = { row ->
+                row is SaberCommandResponseParser.TrackRow.Track ||
+                    row is SaberCommandResponseParser.TrackRow.Header
+            },
             levelProvider = { row -> row.level }
         )
     }
@@ -131,6 +134,7 @@ class MainActivity : AppCompatActivity() {
     private var trackRows: List<SaberCommandResponseParser.TrackRow> = emptyList()
     private var trackVisualOptions: List<SaberCommandResponseParser.TrackVisualOption> = emptyList()
     private val expandedPresetHeaderIndices = linkedSetOf<Int>()
+    private val expandedTrackHeaderKeys = linkedSetOf<String>()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -366,12 +370,18 @@ class MainActivity : AppCompatActivity() {
         }
         pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val row = trackRows.getOrNull(position)
-            if (row is SaberCommandResponseParser.TrackRow.Track) {
-                selectedTrackPath = row.path
-                renderAll()
-                runWithBlePermissions {
-                    launchBleTask { playTrackInternal(row.path) }
+            when (row) {
+                is SaberCommandResponseParser.TrackRow.Header -> {
+                    toggleTrackHeader(row.key)
                 }
+                is SaberCommandResponseParser.TrackRow.Track -> {
+                    selectedTrackPath = row.path
+                    renderAll()
+                    runWithBlePermissions {
+                        launchBleTask { playTrackInternal(row.path) }
+                    }
+                }
+                null -> Unit
             }
         }
         pageBinding.seekVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -561,6 +571,8 @@ class MainActivity : AppCompatActivity() {
                             presetRows = emptyList()
                             trackPaths = emptyList()
                             trackRows = emptyList()
+                            expandedPresetHeaderIndices.clear()
+                            expandedTrackHeaderKeys.clear()
                             trackPolicy = null
                             trackSessionMode = null
                             trackVisualSelectedId = null
@@ -779,10 +791,10 @@ class MainActivity : AppCompatActivity() {
         if (!result.success) return
 
         trackPaths = SaberCommandResponseParser.parseTrackPaths(result.response)
-        trackRows = SaberCommandResponseParser.buildTrackRows(trackPaths)
         if (selectedTrackPath !in trackPaths) {
             selectedTrackPath = nowPlaying?.takeIf(trackPaths::contains)
         }
+        rebuildTrackRows(ensureCurrentTrackVisible = true)
         trackStatus = if (trackPaths.isEmpty()) {
             "No tracks returned by saber"
         } else {
@@ -821,6 +833,7 @@ class MainActivity : AppCompatActivity() {
         if (selectedTrackPath == null && nowPlaying != null) {
             selectedTrackPath = nowPlaying
         }
+        rebuildTrackRows(ensureCurrentTrackVisible = true)
         trackStatus = if (nowPlaying == null) {
             "Nothing playing"
         } else {
@@ -1417,6 +1430,9 @@ class MainActivity : AppCompatActivity() {
         state.visualActive?.let { trackVisualActive = it }
         state.visualActiveName?.let { trackVisualActiveName = it }
         state.visualPreviewActive?.let { trackVisualPreviewActive = it }
+        if (trackPaths.isNotEmpty()) {
+            rebuildTrackRows(ensureCurrentTrackVisible = true)
+        }
         return state
     }
 
@@ -1425,6 +1441,14 @@ class MainActivity : AppCompatActivity() {
             expandedPresetHeaderIndices.remove(headerIndex)
         }
         rebuildPresetRows(ensureCurrentPresetVisible = false)
+        renderAll()
+    }
+
+    private fun toggleTrackHeader(headerKey: String) {
+        if (!expandedTrackHeaderKeys.add(headerKey)) {
+            expandedTrackHeaderKeys.remove(headerKey)
+        }
+        rebuildTrackRows(ensureCurrentTrackVisible = false)
         renderAll()
     }
 
@@ -1441,6 +1465,22 @@ class MainActivity : AppCompatActivity() {
     private fun ensureCurrentPresetHeaderExpanded() {
         val headerIndex = headerIndexForPreset(currentPresetIndex) ?: return
         expandedPresetHeaderIndices.add(headerIndex)
+    }
+
+    private fun rebuildTrackRows(ensureCurrentTrackVisible: Boolean) {
+        if (ensureCurrentTrackVisible) {
+            ensureCurrentTrackHeadersExpanded()
+        }
+        trackRows = SaberCommandResponseParser.buildTrackRows(
+            trackPaths = trackPaths,
+            expandedHeaderKeys = expandedTrackHeaderKeys
+        )
+    }
+
+    private fun ensureCurrentTrackHeadersExpanded() {
+        for (key in SaberCommandResponseParser.trackHeaderKeysForPath(activeTrackPath())) {
+            expandedTrackHeaderKeys.add(key)
+        }
     }
 
     private fun headerIndexForPreset(presetIndex: Int?): Int? {

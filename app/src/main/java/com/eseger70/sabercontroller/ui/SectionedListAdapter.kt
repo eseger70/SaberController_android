@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.TextView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import com.eseger70.sabercontroller.R
 import java.util.Locale
@@ -19,13 +20,12 @@ class SectionedListAdapter<T>(
     private val enabledProvider: (T) -> Boolean,
     private val levelProvider: (T) -> Int = { 0 }
 ) : BaseAdapter() {
+    private val context = context
     private val inflater = LayoutInflater.from(context)
     private val horizontalPadding = dp(context, 16)
     private val nestedPadding = dp(context, 32)
     private val indentStep = dp(context, 18)
-    private val verticalPadding = dp(context, 12)
-    private val selectedColor = ContextCompat.getColor(context, R.color.app_selected_row)
-    private val headerRowColor = ContextCompat.getColor(context, R.color.app_header_row)
+    private val verticalPadding = dp(context, 13)
     private val primaryTextColor = ContextCompat.getColor(context, R.color.app_text_primary)
     private val secondaryTextColor = ContextCompat.getColor(context, R.color.app_text_secondary)
     private val headerTextColor = ContextCompat.getColor(context, R.color.app_header_text)
@@ -54,11 +54,11 @@ class SectionedListAdapter<T>(
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         val itemView = convertView ?: inflater.inflate(
-            android.R.layout.simple_list_item_activated_1,
+            R.layout.item_sectioned_row,
             parent,
             false
         )
-        val textView = itemView.findViewById<TextView>(android.R.id.text1)
+        val textView = itemView.findViewById<TextView>(R.id.textRowLabel)
         val item = getItem(position)
         val isHeader = headerProvider(item)
         val isEnabled = enabledProvider(item)
@@ -86,11 +86,12 @@ class SectionedListAdapter<T>(
             verticalPadding
         )
         itemView.isActivated = position == selectedPosition
-        itemView.setBackgroundColor(
+        textView.background = AppCompatResources.getDrawable(
+            context,
             when {
-                position == selectedPosition -> selectedColor
-                isHeader -> headerRowColor
-                else -> 0
+                position == selectedPosition -> R.drawable.bg_list_row_selected
+                isHeader -> R.drawable.bg_list_row_header
+                else -> R.drawable.bg_list_row
             }
         )
         itemView.isEnabled = isEnabled

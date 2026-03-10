@@ -44,6 +44,14 @@ import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
+    private enum class ChipTone(val backgroundRes: Int, val textColorRes: Int) {
+        PRIMARY(R.drawable.bg_chip_primary, R.color.app_chip_primary_text),
+        SUCCESS(R.drawable.bg_chip_success, R.color.app_chip_success_text),
+        WARNING(R.drawable.bg_chip_warning, R.color.app_chip_warning_text),
+        ERROR(R.drawable.bg_chip_error, R.color.app_chip_error_text),
+        NEUTRAL(R.drawable.bg_chip_neutral, R.color.app_header_text)
+    }
+
     companion object {
         private const val MAX_VOLUME = 2000
         private const val LOG_TAG_APP = "SaberCtrl"
@@ -500,6 +508,14 @@ class MainActivity : AppCompatActivity() {
                         val previous = currentConnectionState
                         currentConnectionState = state
                         binding.textConnectionStateValue.text = state.name
+                        applyChipTone(
+                            binding.textConnectionStateValue,
+                            when (state) {
+                                ConnectionState.READY -> ChipTone.SUCCESS
+                                ConnectionState.DISCONNECTED -> ChipTone.NEUTRAL
+                                else -> ChipTone.WARNING
+                            }
+                        )
                         binding.buttonConnect.isEnabled = state == ConnectionState.DISCONNECTED
                         binding.buttonDisconnect.isEnabled = state != ConnectionState.DISCONNECTED
                         renderAll()
@@ -1000,6 +1016,14 @@ class MainActivity : AppCompatActivity() {
             false -> "OFF (0)"
             null -> getString(R.string.state_unknown)
         }
+        applyChipTone(
+            pageBinding.textLastStateValue,
+            when (bladeState) {
+                true -> ChipTone.SUCCESS
+                false -> ChipTone.ERROR
+                null -> ChipTone.NEUTRAL
+            }
+        )
         pageBinding.textCurrentPresetValue.text = currentPreset?.let { entry ->
             if (entry.isHeader) {
                 "${entry.displayName} (header)"
@@ -1007,6 +1031,12 @@ class MainActivity : AppCompatActivity() {
                 entry.displayName
             }
         } ?: getString(R.string.state_unknown)
+        pageBinding.textCurrentPresetValue.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (currentPreset?.isHeader == true) R.color.app_chip_warning_text else R.color.app_text_primary
+            )
+        )
         pageBinding.textPresetCountValue.text = if (presetEntries.isEmpty()) {
             getString(R.string.preset_count_empty)
         } else {
@@ -1035,6 +1065,12 @@ class MainActivity : AppCompatActivity() {
             else -> "Ready"
         }
         pageBinding.textNowPlayingValue.text = nowPlaying ?: getString(R.string.state_none)
+        pageBinding.textNowPlayingValue.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (nowPlaying.isNullOrBlank()) R.color.app_text_secondary else R.color.app_primary
+            )
+        )
         pageBinding.textTrackCountValue.text = if (trackPaths.isEmpty()) {
             getString(R.string.track_count_empty)
         } else {
@@ -1067,6 +1103,34 @@ class MainActivity : AppCompatActivity() {
         pageBinding.textTrackVisualSelectionValue.text = displaySelectedTrackVisual()
         pageBinding.textTrackVisualRuntimeValue.text = buildTrackVisualRuntimeSummary()
         pageBinding.textTrackVisualTrackValue.text = activeTrackPath() ?: getString(R.string.state_none)
+        pageBinding.textTrackVisualTrackValue.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (activeTrackPath().isNullOrBlank()) R.color.app_text_secondary else R.color.app_text_primary
+            )
+        )
+        applyChipTone(
+            pageBinding.textTrackVisualPolicyValue,
+            when (trackPolicy) {
+                "visual" -> ChipTone.SUCCESS
+                "preserve" -> ChipTone.WARNING
+                "auto" -> ChipTone.PRIMARY
+                else -> ChipTone.NEUTRAL
+            }
+        )
+        applyChipTone(
+            pageBinding.textTrackVisualSelectionValue,
+            if ((trackVisualSelectedId ?: 0) == 0) ChipTone.NEUTRAL else ChipTone.PRIMARY
+        )
+        applyChipTone(
+            pageBinding.textTrackVisualRuntimeValue,
+            when {
+                trackVisualActive == true -> ChipTone.SUCCESS
+                trackSessionMode == "preserve" -> ChipTone.WARNING
+                trackSessionMode == "visual" -> ChipTone.PRIMARY
+                else -> ChipTone.NEUTRAL
+            }
+        )
 
         trackVisualAdapter.clear()
         trackVisualAdapter.addAll(trackVisualOptions.map { option -> option.name })
@@ -1111,6 +1175,16 @@ class MainActivity : AppCompatActivity() {
             null -> "Blade UNKNOWN"
         }
         pageBinding.textEffectsContextValue.text = "$bladeText | Preset $presetName"
+        pageBinding.textEffectsContextValue.setTextColor(
+            ContextCompat.getColor(
+                this,
+                when (bladeState) {
+                    true -> R.color.app_chip_success_text
+                    false -> R.color.app_chip_error_text
+                    null -> R.color.app_text_secondary
+                }
+            )
+        )
 
         val canUseEffects = currentConnectionState == ConnectionState.READY &&
             bladeState == true &&
@@ -1241,6 +1315,11 @@ class MainActivity : AppCompatActivity() {
     private fun currentPresetEntry(): SaberCommandResponseParser.PresetEntry? {
         val targetIndex = currentPresetIndex ?: return null
         return presetEntries.firstOrNull { entry -> entry.index == targetIndex }
+    }
+
+    private fun applyChipTone(textView: TextView, tone: ChipTone) {
+        textView.background = AppCompatResources.getDrawable(this, tone.backgroundRes)
+        textView.setTextColor(ContextCompat.getColor(this, tone.textColorRes))
     }
 
     private fun activeTrackPath(): String? = selectedTrackPath ?: nowPlaying

@@ -1146,18 +1146,29 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        if (trackPaused == true) {
+            resumeTrackInternal()
+            return
+        }
+
+        pauseTrackInternal()
+    }
+
+    private suspend fun pauseTrackInternal() {
         val result = runCommand(
-            command = "ttp",
+            command = "tpa",
             awaitResponse = true,
             successLog = false
         )
         if (!result.success) return
 
         applyTrackRuntimeState(result.response)
-        trackStatus = when {
-            trackPaused == true -> "Paused ${displayTrackName(nowPlaying)}"
-            nowPlaying != null -> buildTrackStatus(nowPlaying)
-            else -> "Nothing playing"
+        trackStatus = if (trackPaused == true) {
+            "Paused ${displayTrackName(nowPlaying)}"
+        } else if (nowPlaying != null) {
+            buildTrackStatus(nowPlaying)
+        } else {
+            "Nothing playing"
         }
         renderAll()
     }

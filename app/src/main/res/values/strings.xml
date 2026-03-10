@@ -73,15 +73,18 @@
     <string name="track_policy_preserve">Saber</string>
     <string name="track_policy_visual">Music</string>
     <string name="track_visual_picker_title">Track visual</string>
-    <string name="track_visual_picker_hint">Load the firmware-defined visuals, choose one, then apply or clear it for future track playback.</string>
+    <string name="track_visual_picker_hint">Load the firmware-defined visuals, choose one, then apply it for playback or preview it while the blade is off and no track is playing.</string>
     <string name="refresh_visuals">Refresh</string>
     <string name="apply_visual">Apply Visual</string>
     <string name="clear_visual">Clear</string>
+    <string name="preview_visual">Preview</string>
+    <string name="stop_preview">Stop Preview</string>
     <string name="track_visual_none">None</string>
     <string name="track_session_visual">Music visual active</string>
     <string name="track_session_preserve">Preserving saber state</string>
     <string name="track_session_audio_only">Audio only</string>
     <string name="track_session_none">Idle</string>
+    <string name="track_session_preview">Preview active</string>
     <string name="track_visual_active_yes">Visual active</string>
     <string name="track_visual_active_no">Visual inactive</string>
 </resources>

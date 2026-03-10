@@ -14,7 +14,11 @@ object SaberCommandResponseParser {
         val visualSelectedId: Int? = null,
         val visualName: String? = null,
         val visualActive: Boolean? = null,
-        val visualRejectedReason: String? = null
+        val visualRejectedReason: String? = null,
+        val visualActiveId: Int? = null,
+        val visualActiveName: String? = null,
+        val visualPreviewActive: Boolean? = null,
+        val visualPreviewRejectedReason: String? = null
     )
 
     data class PresetEntry(
@@ -38,10 +42,16 @@ object SaberCommandResponseParser {
         abstract val label: String
 
         data class Header(
-            val entry: PresetEntry
+            val entry: PresetEntry,
+            val expanded: Boolean,
+            val childCount: Int
         ) : PresetRow() {
             override val presetIndex: Int = entry.index
-            override val label: String = entry.displayName
+            override val label: String = if (childCount > 0) {
+                "${if (expanded) "[-]" else "[+]"} ${entry.displayName} ($childCount)"
+            } else {
+                entry.displayName
+            }
         }
 
         data class Preset(
@@ -118,15 +128,40 @@ object SaberCommandResponseParser {
         return presets
     }
 
-    fun buildPresetRows(entries: List<PresetEntry>): List<PresetRow> {
+    fun buildPresetRows(
+        entries: List<PresetEntry>,
+        expandedHeaderIndices: Set<Int> = emptySet()
+    ): List<PresetRow> {
         if (entries.isEmpty()) return emptyList()
 
-        val rows = mutableListOf<PresetRow>()
+        val childCountByHeader = mutableMapOf<Int, Int>()
+        var currentHeaderIndex: Int? = null
         for (entry in entries) {
             if (entry.isHeader) {
-                rows.add(PresetRow.Header(entry))
+                currentHeaderIndex = entry.index
+                childCountByHeader.putIfAbsent(entry.index, 0)
+            } else if (currentHeaderIndex != null) {
+                childCountByHeader[currentHeaderIndex] =
+                    (childCountByHeader[currentHeaderIndex] ?: 0) + 1
+            }
+        }
+
+        val rows = mutableListOf<PresetRow>()
+        var activeHeaderIndex: Int? = null
+        for (entry in entries) {
+            if (entry.isHeader) {
+                activeHeaderIndex = entry.index
+                rows.add(
+                    PresetRow.Header(
+                        entry = entry,
+                        expanded = expandedHeaderIndices.contains(entry.index),
+                        childCount = childCountByHeader[entry.index] ?: 0
+                    )
+                )
             } else {
-                rows.add(PresetRow.Preset(entry))
+                if (activeHeaderIndex == null || expandedHeaderIndices.contains(activeHeaderIndex)) {
+                    rows.add(PresetRow.Preset(entry))
+                }
             }
         }
         return rows
@@ -247,6 +282,10 @@ object SaberCommandResponseParser {
         val visualName = fields["TRACK_VISUAL_NAME"]?.ifBlank { null }
         val visualActive = fields["TRACK_VISUAL_ACTIVE"]?.toBooleanFlag()
         val visualRejectedReason = fields["TRACK_VISUAL_REJECTED"]?.ifBlank { null }
+        val visualActiveId = fields["TRACK_VISUAL_ACTIVE_ID"]?.toIntOrNull()
+        val visualActiveName = fields["TRACK_VISUAL_ACTIVE_NAME"]?.ifBlank { null }
+        val visualPreviewActive = fields["TRACK_VISUAL_PREVIEW"]?.toBooleanFlag()
+        val visualPreviewRejectedReason = fields["TRACK_VISUAL_PREVIEW_REJECTED"]?.ifBlank { null }
 
         if (
             nowPlaying == null &&
@@ -256,7 +295,11 @@ object SaberCommandResponseParser {
             visualSelectedId == null &&
             visualName == null &&
             visualActive == null &&
-            visualRejectedReason == null
+            visualRejectedReason == null &&
+            visualActiveId == null &&
+            visualActiveName == null &&
+            visualPreviewActive == null &&
+            visualPreviewRejectedReason == null
         ) {
             return null
         }
@@ -269,7 +312,11 @@ object SaberCommandResponseParser {
             visualSelectedId = visualSelectedId,
             visualName = visualName,
             visualActive = visualActive,
-            visualRejectedReason = visualRejectedReason
+            visualRejectedReason = visualRejectedReason,
+            visualActiveId = visualActiveId,
+            visualActiveName = visualActiveName,
+            visualPreviewActive = visualPreviewActive,
+            visualPreviewRejectedReason = visualPreviewRejectedReason
         )
     }
 

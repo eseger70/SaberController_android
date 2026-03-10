@@ -97,6 +97,20 @@ class SaberCommandResponseParserTest {
         val result = SaberCommandResponseParser.buildPresetRows(entries)
 
         assertTrue(result[0] is SaberCommandResponseParser.PresetRow.Header)
+        assertEquals(1, result.size)
+    }
+
+    @Test
+    fun buildPresetRowsExpandsSelectedHeaderChildren() {
+        val entries = listOf(
+            SaberCommandResponseParser.PresetEntry(index = 0, name = "_sub_Sith"),
+            SaberCommandResponseParser.PresetEntry(index = 1, name = "Vader")
+        )
+
+        val result = SaberCommandResponseParser.buildPresetRows(entries, setOf(0))
+
+        assertEquals(2, result.size)
+        assertTrue(result[0] is SaberCommandResponseParser.PresetRow.Header)
         assertTrue(result[1] is SaberCommandResponseParser.PresetRow.Preset)
     }
 
@@ -188,6 +202,8 @@ class SaberCommandResponseParserTest {
             TRACK_VISUAL_SELECTED=1
             TRACK_VISUAL_NAME=Pulse Amber
             TRACK_VISUAL_ACTIVE=1
+            TRACK_VISUAL_ACTIVE_ID=1
+            TRACK_VISUAL_ACTIVE_NAME=Pulse Amber
             """.trimIndent()
         )
 
@@ -198,6 +214,8 @@ class SaberCommandResponseParserTest {
         assertEquals(1, result?.visualSelectedId)
         assertEquals("Pulse Amber", result?.visualName)
         assertEquals(true, result?.visualActive)
+        assertEquals(1, result?.visualActiveId)
+        assertEquals("Pulse Amber", result?.visualActiveName)
     }
 
     @Test
@@ -217,5 +235,22 @@ class SaberCommandResponseParserTest {
         assertEquals("visual", result?.policy)
         assertEquals("none", result?.sessionMode)
         assertEquals(false, result?.visualActive)
+    }
+
+    @Test
+    fun parseTrackRuntimeStateReadsPreviewFields() {
+        val result = SaberCommandResponseParser.parseTrackRuntimeState(
+            """
+            TRACK_VISUAL_SELECTED=2
+            TRACK_VISUAL_NAME=Blue Pulse
+            TRACK_VISUAL_ACTIVE=1
+            TRACK_VISUAL_PREVIEW=1
+            """.trimIndent()
+        )
+
+        assertEquals(2, result?.visualSelectedId)
+        assertEquals("Blue Pulse", result?.visualName)
+        assertEquals(true, result?.visualActive)
+        assertEquals(true, result?.visualPreviewActive)
     }
 }

@@ -83,7 +83,10 @@ class MainActivity : AppCompatActivity() {
             context = this,
             labelProvider = { row -> row.label },
             headerProvider = { row -> row is SaberCommandResponseParser.PresetRow.Header },
-            enabledProvider = { row -> row is SaberCommandResponseParser.PresetRow.Preset }
+            enabledProvider = { row ->
+                row is SaberCommandResponseParser.PresetRow.Preset ||
+                    row is SaberCommandResponseParser.PresetRow.Header
+            }
         )
     }
     private val trackAdapter by lazy {
@@ -119,12 +122,15 @@ class MainActivity : AppCompatActivity() {
     private var trackVisualSelectedId: Int? = null
     private var trackVisualName: String? = null
     private var trackVisualActive: Boolean? = null
+    private var trackVisualActiveName: String? = null
+    private var trackVisualPreviewActive: Boolean? = null
 
     private var presetEntries: List<SaberCommandResponseParser.PresetEntry> = emptyList()
     private var presetRows: List<SaberCommandResponseParser.PresetRow> = emptyList()
     private var trackPaths: List<String> = emptyList()
     private var trackRows: List<SaberCommandResponseParser.TrackRow> = emptyList()
     private var trackVisualOptions: List<SaberCommandResponseParser.TrackVisualOption> = emptyList()
+    private val expandedPresetHeaderIndices = linkedSetOf<Int>()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -300,10 +306,16 @@ class MainActivity : AppCompatActivity() {
         }
         pageBinding.listPresets.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val row = presetRows.getOrNull(position)
-            if (row is SaberCommandResponseParser.PresetRow.Preset) {
-                runWithBlePermissions {
-                    launchBleTask { selectPresetInternal(row.entry) }
+            when (row) {
+                is SaberCommandResponseParser.PresetRow.Header -> {
+                    togglePresetHeader(row.entry.index)
                 }
+                is SaberCommandResponseParser.PresetRow.Preset -> {
+                    runWithBlePermissions {
+                        launchBleTask { selectPresetInternal(row.entry) }
+                    }
+                }
+                null -> Unit
             }
         }
         pageBinding.seekVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -422,6 +434,16 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonClearTrackVisual.setOnClickListener {
             runWithBlePermissions {
                 launchBleTask { clearTrackVisualInternal() }
+            }
+        }
+        pageBinding.buttonPreviewTrackVisual.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { previewTrackVisualInternal() }
+            }
+        }
+        pageBinding.buttonStopTrackVisualPreview.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { stopTrackVisualPreviewInternal() }
             }
         }
 
@@ -544,6 +566,8 @@ class MainActivity : AppCompatActivity() {
                             trackVisualSelectedId = null
                             trackVisualName = null
                             trackVisualActive = null
+                            trackVisualActiveName = null
+                            trackVisualPreviewActive = null
                             trackVisualOptions = emptyList()
                             saberStatus = "Disconnected"
                             trackStatus = "Disconnected"
@@ -642,7 +666,7 @@ class MainActivity : AppCompatActivity() {
         if (!result.success) return
 
         presetEntries = SaberCommandResponseParser.parsePresetEntries(result.response)
-        presetRows = SaberCommandResponseParser.buildPresetRows(presetEntries)
+        rebuildPresetRows(ensureCurrentPresetVisible = true)
         saberStatus = if (presetEntries.isEmpty()) {
             "No presets returned by saber"
         } else {
@@ -660,6 +684,8 @@ class MainActivity : AppCompatActivity() {
         if (!result.success) return
 
         currentPresetIndex = SaberCommandResponseParser.parseCurrentPresetIndex(result.response)
+        ensureCurrentPresetHeaderExpanded()
+        rebuildPresetRows(ensureCurrentPresetVisible = false)
         val currentPreset = currentPresetEntry()
         saberStatus = when {
             currentPreset == null -> "Current preset index unavailable"
@@ -687,6 +713,8 @@ class MainActivity : AppCompatActivity() {
         if (!result.success) return
 
         currentPresetIndex = entry.index
+        ensureCurrentPresetHeaderExpanded()
+        rebuildPresetRows(ensureCurrentPresetVisible = false)
         saberStatus = "Preset selected: ${entry.displayName}"
         renderAll()
         refreshCurrentPresetInternal(logCompletion = false)
@@ -932,6 +960,54 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private suspend fun previewTrackVisualInternal() {
+        val option = stylesPageBinding
+            ?.spinnerTrackVisuals
+            ?.selectedItemPosition
+            ?.let(trackVisualOptions::getOrNull)
+            ?: trackVisualOptions.firstOrNull { it.id == (trackVisualSelectedId ?: 0) }
+
+        if (option == null || option.id == 0) {
+            visualsStatus = "Choose a track visual before previewing it."
+            renderAll()
+            return
+        }
+
+        visualsStatus = "Previewing ${option.name}"
+        renderAll()
+
+        val result = runCommand(
+            command = "tvp ${option.id}",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        val state = applyTrackRuntimeState(result.response)
+        visualsStatus = when (state?.visualPreviewRejectedReason) {
+            "blade_on" -> "Preview requires the blade to be off."
+            "track_active" -> "Stop track playback before starting a preview."
+            else -> "Previewing ${option.name}"
+        }
+        renderAll()
+    }
+
+    private suspend fun stopTrackVisualPreviewInternal() {
+        visualsStatus = "Stopping track visual preview"
+        renderAll()
+
+        val result = runCommand(
+            command = "tvx",
+            awaitResponse = true,
+            successLog = false
+        )
+        if (!result.success) return
+
+        applyTrackRuntimeState(result.response)
+        visualsStatus = "Track visual preview stopped"
+        renderAll()
+    }
+
     private fun triggerEffect(command: String, fallbackMessage: String) {
         runWithBlePermissions {
             launchBleTask { triggerEffectInternal(command, fallbackMessage) }
@@ -1125,6 +1201,7 @@ class MainActivity : AppCompatActivity() {
         applyChipTone(
             pageBinding.textTrackVisualRuntimeValue,
             when {
+                trackVisualPreviewActive == true -> ChipTone.SUCCESS
                 trackVisualActive == true -> ChipTone.SUCCESS
                 trackSessionMode == "preserve" -> ChipTone.WARNING
                 trackSessionMode == "visual" -> ChipTone.PRIMARY
@@ -1150,6 +1227,8 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonPolicyMusic.isEnabled = canInteract
         pageBinding.buttonApplyTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
         pageBinding.buttonClearTrackVisual.isEnabled = canInteract && (trackVisualSelectedId ?: 0) != 0
+        pageBinding.buttonPreviewTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
+        pageBinding.buttonStopTrackVisualPreview.isEnabled = canInteract && trackVisualPreviewActive == true
 
         when (trackPolicy) {
             "visual" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyMusic)
@@ -1336,7 +1415,47 @@ class MainActivity : AppCompatActivity() {
         state.visualSelectedId?.let { trackVisualSelectedId = it }
         state.visualName?.let { trackVisualName = it }
         state.visualActive?.let { trackVisualActive = it }
+        state.visualActiveName?.let { trackVisualActiveName = it }
+        state.visualPreviewActive?.let { trackVisualPreviewActive = it }
         return state
+    }
+
+    private fun togglePresetHeader(headerIndex: Int) {
+        if (!expandedPresetHeaderIndices.add(headerIndex)) {
+            expandedPresetHeaderIndices.remove(headerIndex)
+        }
+        rebuildPresetRows(ensureCurrentPresetVisible = false)
+        renderAll()
+    }
+
+    private fun rebuildPresetRows(ensureCurrentPresetVisible: Boolean) {
+        if (ensureCurrentPresetVisible) {
+            ensureCurrentPresetHeaderExpanded()
+        }
+        presetRows = SaberCommandResponseParser.buildPresetRows(
+            entries = presetEntries,
+            expandedHeaderIndices = expandedPresetHeaderIndices
+        )
+    }
+
+    private fun ensureCurrentPresetHeaderExpanded() {
+        val headerIndex = headerIndexForPreset(currentPresetIndex) ?: return
+        expandedPresetHeaderIndices.add(headerIndex)
+    }
+
+    private fun headerIndexForPreset(presetIndex: Int?): Int? {
+        val targetIndex = presetIndex ?: return null
+        var currentHeaderIndex: Int? = null
+        for (entry in presetEntries) {
+            if (entry.isHeader) {
+                currentHeaderIndex = entry.index
+                continue
+            }
+            if (entry.index == targetIndex) {
+                return currentHeaderIndex
+            }
+        }
+        return null
     }
 
     private fun buildTrackStatus(trackPath: String?): String {
@@ -1378,7 +1497,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildTrackVisualRuntimeSummary(): String {
-        val modeText = displayTrackSessionMode(trackSessionMode)
+        val modeText = when (trackVisualPreviewActive) {
+            true -> trackVisualActiveName?.let { "Preview: $it" } ?: getString(R.string.track_session_preview)
+            else -> displayTrackSessionMode(trackSessionMode)
+        }
         val activeText = when (trackVisualActive) {
             true -> getString(R.string.track_visual_active_yes)
             false -> getString(R.string.track_visual_active_no)

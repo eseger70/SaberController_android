@@ -299,6 +299,36 @@
                         app:backgroundTint="@color/app_surface_alt"
                         app:cornerRadius="18dp" />
                 </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonPreviewTrackVisual"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/preview_visual"
+                        android:textColor="@color/app_text_primary"
+                        app:backgroundTint="@color/app_surface_alt"
+                        app:cornerRadius="18dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonStopTrackVisualPreview"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="@string/stop_preview"
+                        android:textColor="@color/app_text_primary"
+                        app:backgroundTint="@color/app_surface_alt"
+                        app:cornerRadius="18dp" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>

@@ -1425,22 +1425,24 @@ class MainActivity : AppCompatActivity() {
             "${trackPaths.size} tracks"
         }
         val selectedScopeKey = selectedTrackHeaderKey ?: queueScopeHeaderKey
-        pageBinding.textSelectedTrackGroupValue.text = displayTrackQueueScope(selectedScopeKey)
+        pageBinding.textSelectedTrackGroupValue.text =
+            "Folder: ${displayTrackQueueScope(selectedScopeKey)}"
         pageBinding.textSelectedTrackGroupValue.setTextColor(
             ContextCompat.getColor(
                 this,
                 if (selectedScopeKey == null) R.color.app_text_secondary else R.color.app_primary
             )
         )
-        pageBinding.textQueueModeValue.text = when {
+        val queueModeText = when {
             trackPaused == true && queueAutoAdvanceEnabled && queueRepeatEnabled -> "Paused | Queue + Repeat"
             trackPaused == true && queueAutoAdvanceEnabled -> "Paused | Queue Active"
             trackPaused == true -> "Paused"
             queueAutoAdvanceEnabled && queueRepeatEnabled -> "Queue Active | Repeat"
             queueAutoAdvanceEnabled -> "Queue Active"
             queueRepeatEnabled -> "Repeat Armed"
-            else -> "Single Track"
+            else -> getString(R.string.queue_mode_single_track)
         }
+        pageBinding.textQueueModeValue.text = "Queue: $queueModeText"
 
         trackAdapter.items = trackRows
         val selectedTrackRowIndex = trackRows.indexOfFirst { row ->

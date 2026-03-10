@@ -47,11 +47,7 @@ object SaberCommandResponseParser {
             val childCount: Int
         ) : PresetRow() {
             override val presetIndex: Int = entry.index
-            override val label: String = if (childCount > 0) {
-                "${if (expanded) "[-]" else "[+]"} ${entry.displayName} ($childCount)"
-            } else {
-                entry.displayName
-            }
+            override val label: String = entry.displayName
         }
 
         data class Preset(
@@ -73,11 +69,7 @@ object SaberCommandResponseParser {
             val expanded: Boolean,
             val childCount: Int
         ) : TrackRow() {
-            override val label: String = if (childCount > 0) {
-                "${if (expanded) "[-]" else "[+]"} $title ($childCount)"
-            } else {
-                title
-            }
+            override val label: String = title
         }
 
         data class Track(
@@ -304,6 +296,16 @@ object SaberCommandResponseParser {
         for (directory in directories) {
             keySegments += directory
             keys += keySegments.joinToString("/")
+        }
+        return keys
+    }
+
+    fun allTrackHeaderKeys(trackPaths: List<String>): Set<String> {
+        if (trackPaths.isEmpty()) return emptySet()
+
+        val keys = linkedSetOf<String>()
+        for (trackPath in trackPaths) {
+            keys.addAll(trackHeaderKeysForPath(trackPath))
         }
         return keys
     }

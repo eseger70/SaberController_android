@@ -230,6 +230,22 @@ class SaberCommandResponseParserTest {
     }
 
     @Test
+    fun allTrackHeaderKeysIncludesRootAndNestedFolders() {
+        val result = SaberCommandResponseParser.allTrackHeaderKeys(
+            listOf(
+                "tracks/mars.wav",
+                "tracks/Christmas/album_a/song_1.wav",
+                "Artist_1/tracks/album_d/song_3.wav"
+            )
+        )
+
+        assertEquals(
+            linkedSetOf("__root_tracks__", "Christmas", "Christmas/album_a", "Artist_1", "Artist_1/album_d"),
+            result
+        )
+    }
+
+    @Test
     fun parseTrackVisualOptionsReadsIdsAndNames() {
         val result = SaberCommandResponseParser.parseTrackVisualOptions(
             """

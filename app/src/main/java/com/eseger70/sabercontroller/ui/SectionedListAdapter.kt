@@ -18,8 +18,14 @@ class SectionedListAdapter<T>(
     private val labelProvider: (T) -> String,
     private val headerProvider: (T) -> Boolean,
     private val enabledProvider: (T) -> Boolean,
-    private val levelProvider: (T) -> Int = { 0 }
+    private val levelProvider: (T) -> Int = { 0 },
+    private val headerStateProvider: (T) -> HeaderState? = { null }
 ) : BaseAdapter() {
+    data class HeaderState(
+        val expanded: Boolean,
+        val childCount: Int
+    )
+
     private val context = context
     private val inflater = LayoutInflater.from(context)
     private val horizontalPadding = dp(context, 16)
@@ -59,13 +65,17 @@ class SectionedListAdapter<T>(
             false
         )
         val textView = itemView.findViewById<TextView>(R.id.textRowLabel)
+        val indicatorView = itemView.findViewById<TextView>(R.id.textRowIndicator)
+        val countView = itemView.findViewById<TextView>(R.id.textRowCount)
+        val container = itemView.findViewById<View>(R.id.rowContainer)
         val item = getItem(position)
         val isHeader = headerProvider(item)
         val isEnabled = enabledProvider(item)
         val level = levelProvider(item).coerceAtLeast(0)
+        val headerState = headerStateProvider(item)
 
         val rawLabel = labelProvider(item)
-        textView.text = if (isHeader) rawLabel.uppercase(Locale.getDefault()) else rawLabel
+        textView.text = rawLabel
         textView.setTypeface(null, if (isHeader) Typeface.BOLD else Typeface.NORMAL)
         textView.setAllCaps(false)
         textView.alpha = if (isEnabled || isHeader) 1.0f else 0.6f
@@ -76,17 +86,17 @@ class SectionedListAdapter<T>(
                 else -> secondaryTextColor
             }
         )
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (isHeader) 12f else 16f)
-        textView.letterSpacing = if (isHeader) 0.08f else 0.01f
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (isHeader) 14f else 16f)
+        textView.letterSpacing = if (isHeader) 0.02f else 0.01f
         val leftPadding = (if (isHeader) horizontalPadding else nestedPadding) + (level * indentStep)
-        textView.setPadding(
+        container.setPadding(
             leftPadding,
             verticalPadding,
             horizontalPadding,
             verticalPadding
         )
         itemView.isActivated = position == selectedPosition
-        textView.background = AppCompatResources.getDrawable(
+        container.background = AppCompatResources.getDrawable(
             context,
             when {
                 position == selectedPosition -> R.drawable.bg_list_row_selected
@@ -94,6 +104,28 @@ class SectionedListAdapter<T>(
                 else -> R.drawable.bg_list_row
             }
         )
+        if (isHeader) {
+            indicatorView.visibility = View.VISIBLE
+            indicatorView.text = if (headerState?.expanded == true) "v" else ">"
+            indicatorView.alpha = if ((headerState?.childCount ?: 0) > 0) 1.0f else 0.45f
+            indicatorView.background = AppCompatResources.getDrawable(
+                context,
+                if (position == selectedPosition) R.drawable.bg_list_row_indicator_active
+                else R.drawable.bg_list_row_indicator
+            )
+            val childCount = headerState?.childCount ?: 0
+            if (childCount > 0) {
+                countView.visibility = View.VISIBLE
+                countView.text = childCount.toString()
+            } else {
+                countView.visibility = View.GONE
+                countView.text = ""
+            }
+        } else {
+            indicatorView.visibility = View.GONE
+            countView.visibility = View.GONE
+            countView.text = ""
+        }
         itemView.isEnabled = isEnabled
         return itemView
     }

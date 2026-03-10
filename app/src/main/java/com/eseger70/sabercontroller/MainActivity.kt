@@ -86,6 +86,17 @@ class MainActivity : AppCompatActivity() {
             enabledProvider = { row ->
                 row is SaberCommandResponseParser.PresetRow.Preset ||
                     row is SaberCommandResponseParser.PresetRow.Header
+            },
+            headerStateProvider = { row ->
+                when (row) {
+                    is SaberCommandResponseParser.PresetRow.Header -> {
+                        SectionedListAdapter.HeaderState(
+                            expanded = row.expanded,
+                            childCount = row.childCount
+                        )
+                    }
+                    else -> null
+                }
             }
         )
     }
@@ -98,7 +109,18 @@ class MainActivity : AppCompatActivity() {
                 row is SaberCommandResponseParser.TrackRow.Track ||
                     row is SaberCommandResponseParser.TrackRow.Header
             },
-            levelProvider = { row -> row.level }
+            levelProvider = { row -> row.level },
+            headerStateProvider = { row ->
+                when (row) {
+                    is SaberCommandResponseParser.TrackRow.Header -> {
+                        SectionedListAdapter.HeaderState(
+                            expanded = row.expanded,
+                            childCount = row.childCount
+                        )
+                    }
+                    else -> null
+                }
+            }
         )
     }
     private val trackVisualAdapter by lazy {
@@ -367,6 +389,12 @@ class MainActivity : AppCompatActivity() {
             runWithBlePermissions {
                 launchBleTask { refreshVolumeInternal() }
             }
+        }
+        pageBinding.buttonExpandAllTracks.setOnClickListener {
+            expandAllTrackHeaders()
+        }
+        pageBinding.buttonCollapseAllTracks.setOnClickListener {
+            collapseAllTrackHeaders()
         }
         pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val row = trackRows.getOrNull(position)
@@ -1176,6 +1204,8 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonRefreshTracks.isEnabled = canInteract
         pageBinding.buttonRefreshNowPlaying.isEnabled = canInteract
         pageBinding.buttonStopTrack.isEnabled = canInteract
+        pageBinding.buttonExpandAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
+        pageBinding.buttonCollapseAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
         pageBinding.buttonRefreshVolume.isEnabled = canInteract
         pageBinding.seekVolume.isEnabled = canInteract
@@ -1448,6 +1478,19 @@ class MainActivity : AppCompatActivity() {
         if (!expandedTrackHeaderKeys.add(headerKey)) {
             expandedTrackHeaderKeys.remove(headerKey)
         }
+        rebuildTrackRows(ensureCurrentTrackVisible = false)
+        renderAll()
+    }
+
+    private fun expandAllTrackHeaders() {
+        expandedTrackHeaderKeys.clear()
+        expandedTrackHeaderKeys.addAll(SaberCommandResponseParser.allTrackHeaderKeys(trackPaths))
+        rebuildTrackRows(ensureCurrentTrackVisible = false)
+        renderAll()
+    }
+
+    private fun collapseAllTrackHeaders() {
+        expandedTrackHeaderKeys.clear()
         rebuildTrackRows(ensureCurrentTrackVisible = false)
         renderAll()
     }

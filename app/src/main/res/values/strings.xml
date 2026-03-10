@@ -87,4 +87,6 @@
     <string name="track_session_preview">Preview active</string>
     <string name="track_visual_active_yes">Visual active</string>
     <string name="track_visual_active_no">Visual inactive</string>
+    <string name="expand_all_tracks">Expand All</string>
+    <string name="collapse_all_tracks">Collapse All</string>
 </resources>

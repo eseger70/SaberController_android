@@ -5,11 +5,52 @@
     android:paddingTop="4dp"
     android:paddingBottom="4dp">
 
-    <TextView
-        android:id="@+id/textRowLabel"
+    <LinearLayout
+        android:id="@+id/rowContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_list_row"
         android:gravity="center_vertical"
-        android:minHeight="48dp" />
+        android:minHeight="48dp"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="13dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="13dp">
+
+        <TextView
+            android:id="@+id/textRowIndicator"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/bg_list_row_indicator"
+            android:gravity="center"
+            android:text=">"
+            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+            android:textColor="@color/app_primary"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/textRowLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_vertical" />
+
+        <TextView
+            android:id="@+id/textRowCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_list_row_count"
+            android:gravity="center"
+            android:minWidth="28dp"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            android:textColor="@color/app_header_text"
+            android:visibility="gone" />
+    </LinearLayout>
 </FrameLayout>

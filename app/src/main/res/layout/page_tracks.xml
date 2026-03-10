@@ -151,6 +151,36 @@
                     android:textColor="@color/app_header_text" />
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonExpandAllTracks"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/expand_all_tracks"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
+                    app:cornerRadius="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonCollapseAllTracks"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="@string/collapse_all_tracks"
+                    android:textColor="@color/app_text_primary"
+                    app:backgroundTint="@color/app_surface_alt"
+                    app:cornerRadius="16dp" />
+            </LinearLayout>
+
             <ListView
                 android:id="@+id/listTracks"
                 android:layout_width="match_parent"

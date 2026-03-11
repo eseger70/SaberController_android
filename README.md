@@ -158,7 +158,7 @@ Secondary surfaces:
      - shuffle
      - repeat
    - watch elapsed / remaining time and the progress bar
-   - use the `Track Visuals` section to:
+   - use the `Visuals` button to open the `Track Visuals` bottom sheet, then:
      - choose playback mode: `Auto`, `Saber`, or `Music`
      - refresh the firmware-defined visual list
      - apply or clear the selected firmware visual

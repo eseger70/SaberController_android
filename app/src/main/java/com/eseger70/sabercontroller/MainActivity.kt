@@ -36,6 +36,7 @@ import com.eseger70.sabercontroller.databinding.PageSaberBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
 import com.eseger70.sabercontroller.databinding.SheetDebugBinding
 import com.eseger70.sabercontroller.databinding.SheetEffectsBinding
+import com.eseger70.sabercontroller.databinding.SheetMusicVisualsBinding
 import com.eseger70.sabercontroller.track.VisualAssignmentResolver
 import com.eseger70.sabercontroller.track.VisualAssignmentRule
 import com.eseger70.sabercontroller.track.VisualAssignmentScope
@@ -85,8 +86,10 @@ class MainActivity : AppCompatActivity() {
     private var tracksPageBinding: PageTracksBinding? = null
     private var effectsSheetBinding: SheetEffectsBinding? = null
     private var debugSheetBinding: SheetDebugBinding? = null
+    private var musicVisualsSheetBinding: SheetMusicVisualsBinding? = null
     private var effectsBottomSheet: BottomSheetDialog? = null
     private var debugBottomSheet: BottomSheetDialog? = null
+    private var musicVisualsBottomSheet: BottomSheetDialog? = null
 
     private val presetAdapter by lazy {
         SectionedListAdapter<SaberCommandResponseParser.PresetRow>(
@@ -240,6 +243,7 @@ class MainActivity : AppCompatActivity() {
         stopTrackMonitor()
         effectsBottomSheet?.dismiss()
         debugBottomSheet?.dismiss()
+        musicVisualsBottomSheet?.dismiss()
         bleManager.close()
         super.onDestroy()
     }
@@ -416,15 +420,6 @@ class MainActivity : AppCompatActivity() {
         if (pageBinding.listTracks.adapter !== trackAdapter) {
             pageBinding.listTracks.adapter = trackAdapter
         }
-        if (pageBinding.spinnerTrackVisuals.adapter !== trackVisualAdapter) {
-            pageBinding.spinnerTrackVisuals.adapter = trackVisualAdapter
-        }
-        if (pageBinding.spinnerTrackVisualOverride.adapter !== trackVisualOverrideAdapter) {
-            pageBinding.spinnerTrackVisualOverride.adapter = trackVisualOverrideAdapter
-        }
-        if (pageBinding.spinnerVisualAssignmentScope.adapter !== visualAssignmentScopeAdapter) {
-            pageBinding.spinnerVisualAssignmentScope.adapter = visualAssignmentScopeAdapter
-        }
 
         pageBinding.buttonRefreshTracks.setOnClickListener {
             runWithBlePermissions {
@@ -440,6 +435,9 @@ class MainActivity : AppCompatActivity() {
             runWithBlePermissions {
                 launchBleTask { playSelectedTrackGroupInternal() }
             }
+        }
+        pageBinding.buttonOpenMusicVisuals.setOnClickListener {
+            showMusicVisualsBottomSheet()
         }
         pageBinding.buttonPreviousTrack.setOnClickListener {
             runWithBlePermissions {
@@ -473,57 +471,6 @@ class MainActivity : AppCompatActivity() {
         }
         pageBinding.buttonExpandAllTracks.setOnClickListener { expandAllTrackHeaders() }
         pageBinding.buttonCollapseAllTracks.setOnClickListener { collapseAllTrackHeaders() }
-        pageBinding.toggleTrackPolicy.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            runWithBlePermissions {
-                when (checkedId) {
-                    R.id.buttonPolicyAuto -> launchBleTask { setTrackPolicyInternal("auto") }
-                    R.id.buttonPolicySaber -> launchBleTask { setTrackPolicyInternal("preserve") }
-                    R.id.buttonPolicyMusic -> launchBleTask { setTrackPolicyInternal("visual") }
-                }
-            }
-        }
-        pageBinding.buttonRefreshTrackVisuals.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { refreshTrackVisualOptionsInternal() }
-            }
-        }
-        pageBinding.buttonApplyTrackVisual.setOnClickListener {
-            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
-            runWithBlePermissions {
-                launchBleTask { setTrackVisualInternal(option) }
-            }
-        }
-        pageBinding.buttonClearTrackVisual.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { clearTrackVisualInternal() }
-            }
-        }
-        pageBinding.buttonPreviewTrackVisual.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { previewTrackVisualInternal() }
-            }
-        }
-        pageBinding.buttonStopTrackVisualPreview.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { stopTrackVisualPreviewInternal() }
-            }
-        }
-        pageBinding.buttonAssignTrackVisual.setOnClickListener {
-            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
-            assignVisualRuleFromUi(option)
-        }
-        pageBinding.buttonClearVisualAssignment.setOnClickListener {
-            clearVisualRuleFromUi()
-        }
-        pageBinding.spinnerTrackVisualOverride.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                sessionOverrideVisualId = trackVisualOverrideIdForPosition(position)
-                renderAll()
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-        }
         pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             when (val row = trackRows.getOrNull(position)) {
                 is SaberCommandResponseParser.TrackRow.Header -> {
@@ -573,6 +520,94 @@ class MainActivity : AppCompatActivity() {
         sheetBinding.buttonMelt.setOnClickListener { triggerEffect("mt", "Melt toggled") }
         renderEffectsSheet()
         effectsBottomSheet?.show()
+    }
+
+    private fun showMusicVisualsBottomSheet() {
+        if (musicVisualsBottomSheet?.isShowing == true) {
+            renderMusicVisualsSheet()
+            return
+        }
+
+        val sheetBinding = SheetMusicVisualsBinding.inflate(layoutInflater)
+        musicVisualsSheetBinding = sheetBinding
+        musicVisualsBottomSheet = BottomSheetDialog(this).apply {
+            setContentView(sheetBinding.root)
+            setOnDismissListener {
+                musicVisualsSheetBinding = null
+                musicVisualsBottomSheet = null
+            }
+        }
+
+        if (sheetBinding.spinnerTrackVisuals.adapter !== trackVisualAdapter) {
+            sheetBinding.spinnerTrackVisuals.adapter = trackVisualAdapter
+        }
+        if (sheetBinding.spinnerTrackVisualOverride.adapter !== trackVisualOverrideAdapter) {
+            sheetBinding.spinnerTrackVisualOverride.adapter = trackVisualOverrideAdapter
+        }
+        if (sheetBinding.spinnerVisualAssignmentScope.adapter !== visualAssignmentScopeAdapter) {
+            sheetBinding.spinnerVisualAssignmentScope.adapter = visualAssignmentScopeAdapter
+        }
+
+        sheetBinding.toggleTrackPolicy.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            runWithBlePermissions {
+                when (checkedId) {
+                    R.id.buttonPolicyAuto -> launchBleTask { setTrackPolicyInternal("auto") }
+                    R.id.buttonPolicySaber -> launchBleTask { setTrackPolicyInternal("preserve") }
+                    R.id.buttonPolicyMusic -> launchBleTask { setTrackPolicyInternal("visual") }
+                }
+            }
+        }
+        sheetBinding.buttonRefreshTrackVisuals.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { refreshTrackVisualOptionsInternal() }
+            }
+        }
+        sheetBinding.buttonApplyTrackVisual.setOnClickListener {
+            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
+            runWithBlePermissions {
+                launchBleTask { setTrackVisualInternal(option) }
+            }
+        }
+        sheetBinding.buttonClearTrackVisual.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { clearTrackVisualInternal() }
+            }
+        }
+        sheetBinding.buttonPreviewTrackVisual.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { previewTrackVisualInternal() }
+            }
+        }
+        sheetBinding.buttonStopTrackVisualPreview.setOnClickListener {
+            runWithBlePermissions {
+                launchBleTask { stopTrackVisualPreviewInternal() }
+            }
+        }
+        sheetBinding.buttonAssignTrackVisual.setOnClickListener {
+            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
+            assignVisualRuleFromUi(option)
+        }
+        sheetBinding.buttonClearVisualAssignment.setOnClickListener {
+            clearVisualRuleFromUi()
+        }
+        sheetBinding.spinnerTrackVisualOverride.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    sessionOverrideVisualId = trackVisualOverrideIdForPosition(position)
+                    renderAll()
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
+
+        renderMusicVisualsSheet()
+        musicVisualsBottomSheet?.show()
     }
 
     private fun showDebugBottomSheet() {
@@ -1423,6 +1458,9 @@ class MainActivity : AppCompatActivity() {
     private fun renderAll() {
         saberPageBinding?.let { renderSaberPage(it) }
         tracksPageBinding?.let { renderTracksPage(it) }
+        if (musicVisualsBottomSheet?.isShowing == true) {
+            renderMusicVisualsSheet()
+        }
         if (effectsBottomSheet?.isShowing == true) {
             renderEffectsSheet()
         }
@@ -1590,6 +1628,7 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonExpandAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.buttonCollapseAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
+        pageBinding.buttonOpenMusicVisuals.isEnabled = canInteract
         pageBinding.buttonTogglePauseTrack.icon = AppCompatResources.getDrawable(
             this,
             if (trackPaused == true) R.drawable.ic_control_play else R.drawable.ic_control_pause
@@ -1604,6 +1643,13 @@ class MainActivity : AppCompatActivity() {
                 this,
                 if (queueRepeatEnabled) R.color.app_primary_tint else R.color.app_surface
             )
+
+        pageBinding.textMusicVisualSummaryValue.text = buildMusicVisualSummary()
+    }
+
+    private fun renderMusicVisualsSheet() {
+        val pageBinding = musicVisualsSheetBinding ?: return
+        val canInteract = currentConnectionState == ConnectionState.READY
 
         pageBinding.textTrackVisualPolicyValue.text = displayTrackPolicy(trackPolicy)
         applyChipTone(
@@ -2063,7 +2109,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectedTrackVisualOptionFromMusicUi(): SaberCommandResponseParser.TrackVisualOption? {
-        val pageBinding = tracksPageBinding ?: return null
+        val pageBinding = musicVisualsSheetBinding ?: return null
         return pageBinding.spinnerTrackVisuals.selectedItemPosition
             .takeIf { it in trackVisualOptions.indices }
             ?.let(trackVisualOptions::get)
@@ -2084,7 +2130,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectedAssignmentScopeFromUi(): VisualAssignmentScope {
-        return when (tracksPageBinding?.spinnerVisualAssignmentScope?.selectedItemPosition ?: 0) {
+        return when (musicVisualsSheetBinding?.spinnerVisualAssignmentScope?.selectedItemPosition ?: 0) {
             0 -> VisualAssignmentScope.TRACK
             1 -> VisualAssignmentScope.ALBUM
             2 -> VisualAssignmentScope.CATEGORY
@@ -2171,6 +2217,18 @@ class MainActivity : AppCompatActivity() {
                 "Mapped ${displayAssignmentScope(resolution.matchedScope, resolution.matchedScopeKey)} -> $visualName"
             else -> getString(R.string.visual_assignment_default_summary)
         }
+    }
+
+    private fun buildMusicVisualSummary(): String {
+        val policy = displayTrackPolicy(trackPolicy)
+        val runtime = when {
+            trackVisualPreviewActive == true -> "Preview active"
+            trackVisualActive == true -> "Visual active"
+            trackSessionMode == "preserve" -> "Saber preserved"
+            trackSessionMode == "visual" -> "Music visual ready"
+            else -> "Use mappings"
+        }
+        return "$policy | $runtime"
     }
 
     private fun displayAssignmentScope(scope: VisualAssignmentScope, scopeKey: String): String {

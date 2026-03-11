@@ -7,11 +7,11 @@
     <color name="app_background_top">#F1E7D5</color>
     <color name="app_background_bottom">#BDA98C</color>
     <color name="app_surface">#F8F2E7</color>
-    <color name="app_surface_alt">#E7DED1</color>
+    <color name="app_surface_alt">#EEE4D5</color>
     <color name="app_surface_soft">#FBF7F0</color>
     <color name="app_outline">#9A8C79</color>
     <color name="app_text_primary">#1E232B</color>
-    <color name="app_text_secondary">#655C4E</color>
+    <color name="app_text_secondary">#4D4030</color>
     <color name="app_on_color">#758341</color>
     <color name="app_off_color">#8D4A37</color>
     <color name="app_primary_tint">#E7D7A5</color>
@@ -27,5 +27,5 @@
     <color name="app_log_text">#F3E6C9</color>
     <color name="app_selected_row">#E8D6AD</color>
     <color name="app_header_row">#E2D4BE</color>
-    <color name="app_header_text">#5D503E</color>
+    <color name="app_header_text">#46392A</color>
 </resources>

@@ -23,7 +23,9 @@
     <string name="open_debug">Open debug console</string>
     <string name="debug_sheet_title">Debug Console</string>
     <string name="effects_sheet_title">Effects</string>
+    <string name="music_visuals_sheet_title">Track Visuals</string>
     <string name="effects">Effects</string>
+    <string name="visuals">Visuals</string>
     <string name="sync_short">Sync</string>
     <string name="refresh_short">Refresh</string>
     <string name="apply_short">Apply</string>
@@ -44,6 +46,7 @@
     <string name="track_list_label">Track list</string>
     <string name="music_library_title">Music Library</string>
     <string name="music_scope_none">No folder selected</string>
+    <string name="music_visual_summary_default">Auto | Use mappings</string>
     <string name="volume_label">Volume</string>
     <string name="volume_unknown">Unknown</string>
     <string name="time_zero">0:00</string>
@@ -95,6 +98,7 @@
     <string name="track_visual_picker_title">Track visual</string>
     <string name="track_visual_picker_hint">Load the firmware-defined visuals, choose one, then apply it for playback or preview it while the blade is off and no track is playing.</string>
     <string name="track_visuals_title">Track Visuals</string>
+    <string name="track_visual_summary_label">Track visual summary</string>
     <string name="refresh_visuals">Refresh</string>
     <string name="apply_visual">Apply Visual</string>
     <string name="clear_visual">Clear</string>

@@ -32,19 +32,24 @@ import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.ble.SaberBleManager.ConnectionState
 import com.eseger70.sabercontroller.ble.SaberCommandResponseParser
 import com.eseger70.sabercontroller.databinding.ActivityMainBinding
-import com.eseger70.sabercontroller.databinding.PageEffectsBinding
-import com.eseger70.sabercontroller.databinding.PageLogBinding
 import com.eseger70.sabercontroller.databinding.PageSaberBinding
-import com.eseger70.sabercontroller.databinding.PageStylesBinding
 import com.eseger70.sabercontroller.databinding.PageTracksBinding
+import com.eseger70.sabercontroller.databinding.SheetDebugBinding
+import com.eseger70.sabercontroller.databinding.SheetEffectsBinding
+import com.eseger70.sabercontroller.track.VisualAssignmentResolver
+import com.eseger70.sabercontroller.track.VisualAssignmentRule
+import com.eseger70.sabercontroller.track.VisualAssignmentScope
+import com.eseger70.sabercontroller.track.VisualAssignmentStore
 import com.eseger70.sabercontroller.ui.MainPagerAdapter
 import com.eseger70.sabercontroller.ui.SectionedListAdapter
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
     private enum class ChipTone(val backgroundRes: Int, val textColorRes: Int) {
@@ -68,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleManager: SaberBleManager
     private lateinit var pagerAdapter: MainPagerAdapter
+    private lateinit var visualAssignmentStore: VisualAssignmentStore
 
     private val logLines = ArrayDeque<String>()
     private var lastFrameLine: String? = null
@@ -77,9 +83,10 @@ class MainActivity : AppCompatActivity() {
 
     private var saberPageBinding: PageSaberBinding? = null
     private var tracksPageBinding: PageTracksBinding? = null
-    private var stylesPageBinding: PageStylesBinding? = null
-    private var effectsPageBinding: PageEffectsBinding? = null
-    private var logPageBinding: PageLogBinding? = null
+    private var effectsSheetBinding: SheetEffectsBinding? = null
+    private var debugSheetBinding: SheetDebugBinding? = null
+    private var effectsBottomSheet: BottomSheetDialog? = null
+    private var debugBottomSheet: BottomSheetDialog? = null
 
     private val presetAdapter by lazy {
         SectionedListAdapter<SaberCommandResponseParser.PresetRow>(
@@ -135,6 +142,29 @@ class MainActivity : AppCompatActivity() {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
     }
+    private val trackVisualOverrideAdapter by lazy {
+        ArrayAdapter<String>(
+            this,
+            android.R.layout.simple_spinner_item,
+            mutableListOf<String>()
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+    }
+    private val visualAssignmentScopeAdapter by lazy {
+        ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            mutableListOf(
+                getString(R.string.visual_assignment_scope_track),
+                getString(R.string.visual_assignment_scope_album),
+                getString(R.string.visual_assignment_scope_category),
+                getString(R.string.visual_assignment_scope_default)
+            )
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+    }
 
     private var bladeState: Boolean? = null
     private var saberStatus: String = ""
@@ -146,7 +176,10 @@ class MainActivity : AppCompatActivity() {
     private var selectedTrackHeaderKey: String? = null
     private var currentPresetIndex: Int? = null
     private var currentVolume: Int? = null
+    private var trackActive: Boolean? = null
     private var trackPaused: Boolean? = null
+    private var trackPositionMs: Long? = null
+    private var trackLengthMs: Long? = null
     private var trackPolicy: String? = null
     private var trackSessionMode: String? = null
     private var trackVisualSelectedId: Int? = null
@@ -157,12 +190,17 @@ class MainActivity : AppCompatActivity() {
     private var queueScopeHeaderKey: String? = null
     private var queueAutoAdvanceEnabled: Boolean = false
     private var queueRepeatEnabled: Boolean = false
+    private var shuffleEnabled: Boolean = false
+    private var sessionOverrideVisualId: Int? = null
 
     private var presetEntries: List<SaberCommandResponseParser.PresetEntry> = emptyList()
     private var presetRows: List<SaberCommandResponseParser.PresetRow> = emptyList()
     private var trackPaths: List<String> = emptyList()
     private var trackRows: List<SaberCommandResponseParser.TrackRow> = emptyList()
     private var trackVisualOptions: List<SaberCommandResponseParser.TrackVisualOption> = emptyList()
+    private var visualAssignmentRules: List<VisualAssignmentRule> = emptyList()
+    private var activeQueueOrder: List<String> = emptyList()
+    private val queueHistory = mutableListOf<String>()
     private val expandedPresetHeaderIndices = linkedSetOf<Int>()
     private val expandedTrackHeaderKeys = linkedSetOf<String>()
     private var trackMonitorJob: Job? = null
@@ -188,6 +226,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         bleManager = SaberBleManager(applicationContext)
+        visualAssignmentStore = VisualAssignmentStore(applicationContext)
+        visualAssignmentRules = visualAssignmentStore.loadRules()
         applySystemInsets()
         setupPager()
         wireCommonUi()
@@ -198,6 +238,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         stopTrackMonitor()
+        effectsBottomSheet?.dismiss()
+        debugBottomSheet?.dismiss()
         bleManager.close()
         super.onDestroy()
     }
@@ -205,21 +247,15 @@ class MainActivity : AppCompatActivity() {
     private fun setupPager() {
         pagerAdapter = MainPagerAdapter(
             onSaberPageBound = { pageBinding -> bindSaberPage(pageBinding) },
-            onTracksPageBound = { pageBinding -> bindTracksPage(pageBinding) },
-            onStylesPageBound = { pageBinding -> bindStylesPage(pageBinding) },
-            onEffectsPageBound = { pageBinding -> bindEffectsPage(pageBinding) },
-            onLogPageBound = { pageBinding -> bindLogPage(pageBinding) }
+            onMusicPageBound = { pageBinding -> bindTracksPage(pageBinding) }
         )
         binding.viewPager.adapter = pagerAdapter
-        binding.viewPager.offscreenPageLimit = 5
+        binding.viewPager.offscreenPageLimit = 2
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> getString(R.string.tab_saber)
-                1 -> getString(R.string.tab_tracks)
-                2 -> getString(R.string.tab_styles)
-                3 -> getString(R.string.tab_effects)
-                else -> getString(R.string.tab_log)
+                else -> getString(R.string.tab_music)
             }
         }.attach()
 
@@ -237,6 +273,10 @@ class MainActivity : AppCompatActivity() {
             runWithBlePermissions {
                 bleManager.disconnect()
             }
+        }
+
+        binding.buttonDebug.setOnClickListener {
+            showDebugBottomSheet()
         }
     }
 
@@ -264,10 +304,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyTabStyles() {
         val titles = listOf(
             R.string.tab_saber,
-            R.string.tab_tracks,
-            R.string.tab_styles,
-            R.string.tab_effects,
-            R.string.tab_log
+            R.string.tab_music
         )
 
         titles.forEachIndexed { index, titleRes ->
@@ -335,17 +372,17 @@ class MainActivity : AppCompatActivity() {
                 launchBleTask { syncSaberPageInternal() }
             }
         }
+        pageBinding.buttonOpenEffects.setOnClickListener {
+            showEffectsBottomSheet()
+        }
         pageBinding.buttonRefreshVolume.setOnClickListener {
             runWithBlePermissions {
                 launchBleTask { refreshVolumeInternal() }
             }
         }
         pageBinding.listPresets.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            val row = presetRows.getOrNull(position)
-            when (row) {
-                is SaberCommandResponseParser.PresetRow.Header -> {
-                    togglePresetHeader(row.entry.index)
-                }
+            when (val row = presetRows.getOrNull(position)) {
+                is SaberCommandResponseParser.PresetRow.Header -> togglePresetHeader(row.entry.index)
                 is SaberCommandResponseParser.PresetRow.Preset -> {
                     runWithBlePermissions {
                         launchBleTask { selectPresetInternal(row.entry) }
@@ -379,15 +416,19 @@ class MainActivity : AppCompatActivity() {
         if (pageBinding.listTracks.adapter !== trackAdapter) {
             pageBinding.listTracks.adapter = trackAdapter
         }
+        if (pageBinding.spinnerTrackVisuals.adapter !== trackVisualAdapter) {
+            pageBinding.spinnerTrackVisuals.adapter = trackVisualAdapter
+        }
+        if (pageBinding.spinnerTrackVisualOverride.adapter !== trackVisualOverrideAdapter) {
+            pageBinding.spinnerTrackVisualOverride.adapter = trackVisualOverrideAdapter
+        }
+        if (pageBinding.spinnerVisualAssignmentScope.adapter !== visualAssignmentScopeAdapter) {
+            pageBinding.spinnerVisualAssignmentScope.adapter = visualAssignmentScopeAdapter
+        }
 
         pageBinding.buttonRefreshTracks.setOnClickListener {
             runWithBlePermissions {
                 launchBleTask { refreshTrackListInternal() }
-            }
-        }
-        pageBinding.buttonRefreshNowPlaying.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { refreshNowPlayingInternal() }
             }
         }
         pageBinding.buttonStopTrack.setOnClickListener {
@@ -415,6 +456,12 @@ class MainActivity : AppCompatActivity() {
                 launchBleTask { stepTrackQueueInternal(direction = 1) }
             }
         }
+        pageBinding.buttonShuffleQueue.setOnClickListener {
+            shuffleEnabled = !shuffleEnabled
+            rebuildQueueForCurrentScope(preserveCurrent = true)
+            trackStatus = if (shuffleEnabled) "Shuffle enabled" else "Shuffle disabled"
+            renderAll()
+        }
         pageBinding.buttonRepeatQueue.setOnClickListener {
             queueRepeatEnabled = !queueRepeatEnabled
             trackStatus = if (queueRepeatEnabled) {
@@ -424,90 +471,27 @@ class MainActivity : AppCompatActivity() {
             }
             renderAll()
         }
-        pageBinding.buttonRefreshVolume.setOnClickListener {
+        pageBinding.buttonExpandAllTracks.setOnClickListener { expandAllTrackHeaders() }
+        pageBinding.buttonCollapseAllTracks.setOnClickListener { collapseAllTrackHeaders() }
+        pageBinding.toggleTrackPolicy.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
             runWithBlePermissions {
-                launchBleTask { refreshVolumeInternal() }
-            }
-        }
-        pageBinding.buttonExpandAllTracks.setOnClickListener {
-            expandAllTrackHeaders()
-        }
-        pageBinding.buttonCollapseAllTracks.setOnClickListener {
-            collapseAllTrackHeaders()
-        }
-        pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            val row = trackRows.getOrNull(position)
-            when (row) {
-                is SaberCommandResponseParser.TrackRow.Header -> {
-                    selectedTrackHeaderKey = row.key
-                    toggleTrackHeader(row.key)
-                }
-                is SaberCommandResponseParser.TrackRow.Track -> {
-                    selectedTrackPath = row.path
-                    selectedTrackHeaderKey = SaberCommandResponseParser.deepestTrackHeaderKey(row.path)
-                    renderAll()
-                    runWithBlePermissions {
-                        launchBleTask { playTrackInternal(row.path) }
-                    }
-                }
-                null -> Unit
-            }
-        }
-        pageBinding.seekVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || suppressVolumeCallbacks) return
-                pageBinding.textVolumeValue.text = progress.toString()
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                if (suppressVolumeCallbacks) return
-                val targetVolume = seekBar?.progress ?: return
-                runWithBlePermissions {
-                    launchBleTask { setVolumeInternal(targetVolume) }
+                when (checkedId) {
+                    R.id.buttonPolicyAuto -> launchBleTask { setTrackPolicyInternal("auto") }
+                    R.id.buttonPolicySaber -> launchBleTask { setTrackPolicyInternal("preserve") }
+                    R.id.buttonPolicyMusic -> launchBleTask { setTrackPolicyInternal("visual") }
                 }
             }
-        })
-
-        renderTracksPage(pageBinding)
-    }
-
-    private fun bindStylesPage(pageBinding: PageStylesBinding) {
-        stylesPageBinding = pageBinding
-        if (pageBinding.spinnerTrackVisuals.adapter !== trackVisualAdapter) {
-            pageBinding.spinnerTrackVisuals.adapter = trackVisualAdapter
         }
-
         pageBinding.buttonRefreshTrackVisuals.setOnClickListener {
             runWithBlePermissions {
-                launchBleTask { syncTrackVisualPageInternal() }
-            }
-        }
-        pageBinding.buttonPolicyAuto.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { setTrackPolicyInternal("auto") }
-            }
-        }
-        pageBinding.buttonPolicySaber.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { setTrackPolicyInternal("preserve") }
-            }
-        }
-        pageBinding.buttonPolicyMusic.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { setTrackPolicyInternal("visual") }
+                launchBleTask { refreshTrackVisualOptionsInternal() }
             }
         }
         pageBinding.buttonApplyTrackVisual.setOnClickListener {
-            val option = trackVisualOptions.getOrNull(pageBinding.spinnerTrackVisuals.selectedItemPosition)
-            if (option == null) {
-                visualsStatus = "Load track visuals from the saber first."
-                renderAll()
-            } else {
-                runWithBlePermissions {
-                    launchBleTask { setTrackVisualInternal(option) }
-                }
+            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
+            runWithBlePermissions {
+                launchBleTask { setTrackVisualInternal(option) }
             }
         }
         pageBinding.buttonClearTrackVisual.setOnClickListener {
@@ -525,18 +509,92 @@ class MainActivity : AppCompatActivity() {
                 launchBleTask { stopTrackVisualPreviewInternal() }
             }
         }
+        pageBinding.buttonAssignTrackVisual.setOnClickListener {
+            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
+            assignVisualRuleFromUi(option)
+        }
+        pageBinding.buttonClearVisualAssignment.setOnClickListener {
+            clearVisualRuleFromUi()
+        }
+        pageBinding.spinnerTrackVisualOverride.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                sessionOverrideVisualId = trackVisualOverrideIdForPosition(position)
+                renderAll()
+            }
 
-        renderStylesPage(pageBinding)
-    }
-
-    private fun bindLogPage(pageBinding: PageLogBinding) {
-        logPageBinding = pageBinding
-
-        pageBinding.buttonCopyLog.setOnClickListener {
-            copyTextToClipboard(buildLogText(), getString(R.string.log_copied))
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+            when (val row = trackRows.getOrNull(position)) {
+                is SaberCommandResponseParser.TrackRow.Header -> {
+                    selectedTrackHeaderKey = row.key
+                    toggleTrackHeader(row.key)
+                }
+                is SaberCommandResponseParser.TrackRow.Track -> {
+                    selectedTrackPath = row.path
+                    selectedTrackHeaderKey = SaberCommandResponseParser.deepestTrackHeaderKey(row.path)
+                    renderAll()
+                    runWithBlePermissions {
+                        launchBleTask { playTrackInternal(row.path) }
+                    }
+                }
+                null -> Unit
+            }
         }
 
-        pageBinding.buttonCopyLastFrame.setOnClickListener {
+        renderTracksPage(pageBinding)
+    }
+
+    private fun showEffectsBottomSheet() {
+        if (effectsBottomSheet?.isShowing == true) {
+            renderEffectsSheet()
+            return
+        }
+
+        val sheetBinding = SheetEffectsBinding.inflate(layoutInflater)
+        effectsSheetBinding = sheetBinding
+        effectsBottomSheet = BottomSheetDialog(this).apply {
+            setContentView(sheetBinding.root)
+            setOnDismissListener {
+                effectsSheetBinding = null
+                effectsBottomSheet = null
+            }
+        }
+
+        sheetBinding.buttonClash.setOnClickListener { triggerEffect("cl", "Clash triggered") }
+        sheetBinding.buttonStab.setOnClickListener { triggerEffect("sb", "Stab triggered") }
+        sheetBinding.buttonForce.setOnClickListener { triggerEffect("fo", "Force effect triggered") }
+        sheetBinding.buttonBlast.setOnClickListener { triggerEffect("bt", "Blast triggered") }
+        sheetBinding.buttonLockup.setOnClickListener { triggerEffect("lk", "Lockup toggled") }
+        sheetBinding.buttonDrag.setOnClickListener { triggerEffect("dg", "Drag toggled") }
+        sheetBinding.buttonLightningBlock.setOnClickListener {
+            triggerEffect("lb", "Lightning block toggled")
+        }
+        sheetBinding.buttonMelt.setOnClickListener { triggerEffect("mt", "Melt toggled") }
+        renderEffectsSheet()
+        effectsBottomSheet?.show()
+    }
+
+    private fun showDebugBottomSheet() {
+        if (debugBottomSheet?.isShowing == true) {
+            renderDebugSheet()
+            return
+        }
+
+        val sheetBinding = SheetDebugBinding.inflate(layoutInflater)
+        debugSheetBinding = sheetBinding
+        debugBottomSheet = BottomSheetDialog(this).apply {
+            setContentView(sheetBinding.root)
+            setOnDismissListener {
+                debugSheetBinding = null
+                debugBottomSheet = null
+            }
+        }
+
+        sheetBinding.buttonCopyLog.setOnClickListener {
+            copyTextToClipboard(buildLogText(), getString(R.string.log_copied))
+        }
+        sheetBinding.buttonCopyLastFrame.setOnClickListener {
             val frame = lastFrameLine
             if (frame.isNullOrBlank()) {
                 showToast(getString(R.string.no_frame_captured))
@@ -544,22 +602,19 @@ class MainActivity : AppCompatActivity() {
                 copyTextToClipboard(frame, getString(R.string.last_frame_copied))
             }
         }
-
-        pageBinding.inputRawCommand.doAfterTextChanged {
-            updateRawCommandControls(pageBinding)
+        sheetBinding.inputRawCommand.doAfterTextChanged {
+            updateRawCommandControls(sheetBinding)
         }
-
-        pageBinding.inputRawCommand.setOnEditorActionListener { _, actionId, _ ->
+        sheetBinding.inputRawCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE) {
-                pageBinding.buttonSendRawCommand.performClick()
+                sheetBinding.buttonSendRawCommand.performClick()
                 true
             } else {
                 false
             }
         }
-
-        pageBinding.buttonSendRawCommand.setOnClickListener {
-            val command = pageBinding.inputRawCommand.text
+        sheetBinding.buttonSendRawCommand.setOnClickListener {
+            val command = sheetBinding.inputRawCommand.text
                 ?.toString()
                 ?.trim()
                 .orEmpty()
@@ -572,33 +627,14 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val awaitResponse = pageBinding.checkAwaitResponse.isChecked
+            val awaitResponse = sheetBinding.checkAwaitResponse.isChecked
             runWithBlePermissions {
-                launchBleTask {
-                    sendRawCommandInternal(
-                        command = command,
-                        awaitResponse = awaitResponse
-                    )
-                }
+                launchBleTask { sendRawCommandInternal(command, awaitResponse) }
             }
         }
 
-        renderLogPage(pageBinding)
-    }
-
-    private fun bindEffectsPage(pageBinding: PageEffectsBinding) {
-        effectsPageBinding = pageBinding
-
-        pageBinding.buttonClash.setOnClickListener { triggerEffect("cl", "Clash triggered") }
-        pageBinding.buttonStab.setOnClickListener { triggerEffect("sb", "Stab triggered") }
-        pageBinding.buttonForce.setOnClickListener { triggerEffect("fo", "Force effect triggered") }
-        pageBinding.buttonBlast.setOnClickListener { triggerEffect("bt", "Blast triggered") }
-        pageBinding.buttonLockup.setOnClickListener { triggerEffect("lk", "Lockup toggled") }
-        pageBinding.buttonDrag.setOnClickListener { triggerEffect("dg", "Drag toggled") }
-        pageBinding.buttonLightningBlock.setOnClickListener { triggerEffect("lb", "Lightning block toggled") }
-        pageBinding.buttonMelt.setOnClickListener { triggerEffect("mt", "Melt toggled") }
-
-        renderEffectsPage(pageBinding)
+        renderDebugSheet()
+        debugBottomSheet?.show()
     }
 
     private fun collectBleState() {
@@ -639,7 +675,10 @@ class MainActivity : AppCompatActivity() {
                             selectedTrackHeaderKey = null
                             currentPresetIndex = null
                             currentVolume = null
+                            trackActive = null
                             trackPaused = null
+                            trackPositionMs = null
+                            trackLengthMs = null
                             presetEntries = emptyList()
                             presetRows = emptyList()
                             trackPaths = emptyList()
@@ -649,6 +688,10 @@ class MainActivity : AppCompatActivity() {
                             queueScopeHeaderKey = null
                             queueAutoAdvanceEnabled = false
                             queueRepeatEnabled = false
+                            shuffleEnabled = false
+                            sessionOverrideVisualId = null
+                            activeQueueOrder = emptyList()
+                            queueHistory.clear()
                             trackPolicy = null
                             trackSessionMode = null
                             trackVisualSelectedId = null
@@ -657,6 +700,7 @@ class MainActivity : AppCompatActivity() {
                             trackVisualActiveName = null
                             trackVisualPreviewActive = null
                             trackVisualOptions = emptyList()
+                            visualAssignmentRules = visualAssignmentStore.loadRules()
                             saberStatus = "Disconnected"
                             trackStatus = "Disconnected"
                             visualsStatus = ""
@@ -682,9 +726,10 @@ class MainActivity : AppCompatActivity() {
         if (trackMonitorJob?.isActive == true) return
         trackMonitorJob = lifecycleScope.launch {
             while (isActive) {
-                delay(2_500L)
+                delay(1_000L)
                 if (currentConnectionState != ConnectionState.READY) continue
-                if (!queueAutoAdvanceEnabled || nowPlaying.isNullOrBlank() || trackPaused == true) continue
+                val shouldPoll = trackActive == true || trackPaused == true || queueAutoAdvanceEnabled
+                if (!shouldPoll) continue
 
                 val previousTrack = nowPlaying
                 val result = runCommand(
@@ -696,6 +741,7 @@ class MainActivity : AppCompatActivity() {
                 if (!result.success) continue
 
                 val state = applyTrackRuntimeState(result.response)
+                renderAll()
                 if (previousTrack != null && state?.trackActive == false && state.trackPaused != true) {
                     advanceQueuedTrackInternal(previousTrack)
                 }
@@ -911,6 +957,7 @@ class MainActivity : AppCompatActivity() {
             queueAutoAdvanceEnabled = false
         }
         rebuildTrackRows(ensureCurrentTrackVisible = true)
+        rebuildQueueForCurrentScope(preserveCurrent = true)
         trackStatus = if (trackPaths.isEmpty()) {
             "No tracks returned by saber"
         } else {
@@ -963,13 +1010,23 @@ class MainActivity : AppCompatActivity() {
         queueScopeKey: String? = selectedTrackHeaderKey ?: SaberCommandResponseParser.deepestTrackHeaderKey(trackPath),
         enableAutoAdvance: Boolean = false
     ) {
+        val previousTrack = nowPlaying
         selectedTrackPath = trackPath
         selectedTrackHeaderKey = queueScopeKey ?: SaberCommandResponseParser.deepestTrackHeaderKey(trackPath)
         queueScopeHeaderKey = selectedTrackHeaderKey
         queueAutoAdvanceEnabled = enableAutoAdvance
         trackPaused = false
+        trackActive = true
         trackStatus = "Play requested: ${displayTrackName(trackPath)}"
+        if (!enableAutoAdvance) {
+            rebuildQueueForCurrentScope(anchorTrack = trackPath, preserveCurrent = false)
+        }
+        if (!previousTrack.isNullOrBlank() && previousTrack != trackPath) {
+            pushQueueHistory(previousTrack)
+        }
         renderAll()
+
+        applyEffectiveVisualForTrack(trackPath)
         val trackIndex = trackPaths.indexOf(trackPath)
         val playCommand = if (trackIndex >= 0) {
             "pt $trackIndex"
@@ -1073,6 +1130,7 @@ class MainActivity : AppCompatActivity() {
             renderAll()
             return
         }
+        rebuildQueueForCurrentScope(anchorTrack = startTrack, preserveCurrent = false)
 
         if (trackPaused == true && nowPlaying == startTrack) {
             trackStatus = "Resuming $scopeLabel"
@@ -1094,10 +1152,21 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun stepTrackQueueInternal(direction: Int) {
         val scopeKey = resolveTrackQueueScopeKey()
-        val queue = queueTracksForScope(scopeKey)
+        val queue = activeQueueForScope(scopeKey)
         if (scopeKey == null || queue.isEmpty()) {
             trackStatus = "Select a folder/category or track first."
             renderAll()
+            return
+        }
+
+        if (direction < 0 && queueHistory.isNotEmpty()) {
+            val previousTrack = queueHistory.removeLast()
+            queueScopeHeaderKey = scopeKey
+            playTrackInternal(
+                trackPath = previousTrack,
+                queueScopeKey = scopeKey,
+                enableAutoAdvance = true
+            )
             return
         }
 
@@ -1244,10 +1313,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun previewTrackVisualInternal() {
-        val option = stylesPageBinding
-            ?.spinnerTrackVisuals
-            ?.selectedItemPosition
-            ?.let(trackVisualOptions::getOrNull)
+        val option = selectedTrackVisualOptionFromMusicUi()
             ?: trackVisualOptions.firstOrNull { it.id == (trackVisualSelectedId ?: 0) }
 
         if (option == null || option.id == 0) {
@@ -1357,9 +1423,12 @@ class MainActivity : AppCompatActivity() {
     private fun renderAll() {
         saberPageBinding?.let { renderSaberPage(it) }
         tracksPageBinding?.let { renderTracksPage(it) }
-        stylesPageBinding?.let { renderStylesPage(it) }
-        effectsPageBinding?.let { renderEffectsPage(it) }
-        logPageBinding?.let { renderLogPage(it) }
+        if (effectsBottomSheet?.isShowing == true) {
+            renderEffectsSheet()
+        }
+        if (debugBottomSheet?.isShowing == true) {
+            renderDebugSheet()
+        }
     }
 
     private fun renderSaberPage(pageBinding: PageSaberBinding) {
@@ -1411,6 +1480,7 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonOn.isEnabled = canInteract && currentPreset?.isHeader != true
         pageBinding.buttonOff.isEnabled = canInteract
         pageBinding.buttonSyncSaber.isEnabled = canInteract
+        pageBinding.buttonOpenEffects.isEnabled = canInteract
         pageBinding.listPresets.isEnabled = canInteract && presetRows.isNotEmpty()
         pageBinding.buttonRefreshVolume.isEnabled = canInteract
         pageBinding.seekVolume.isEnabled = canInteract
@@ -1423,11 +1493,21 @@ class MainActivity : AppCompatActivity() {
             currentConnectionState != ConnectionState.READY -> currentConnectionState.name
             else -> "Ready"
         }
-        pageBinding.textNowPlayingValue.text = nowPlaying ?: getString(R.string.state_none)
+        applyChipTone(
+            pageBinding.textTrackStatusValue,
+            when {
+                currentConnectionState != ConnectionState.READY -> ChipTone.WARNING
+                trackPaused == true -> ChipTone.WARNING
+                trackActive == true -> ChipTone.SUCCESS
+                else -> ChipTone.NEUTRAL
+            }
+        )
+        pageBinding.textNowPlayingValue.text = activeTrackPath()?.let(::displayTrackName)
+            ?: getString(R.string.state_none)
         pageBinding.textNowPlayingValue.setTextColor(
             ContextCompat.getColor(
                 this,
-                if (nowPlaying.isNullOrBlank()) R.color.app_text_secondary else R.color.app_primary
+                if (activeTrackPath().isNullOrBlank()) R.color.app_text_secondary else R.color.app_primary
             )
         )
         pageBinding.textTrackCountValue.text = if (trackPaths.isEmpty()) {
@@ -1436,24 +1516,50 @@ class MainActivity : AppCompatActivity() {
             "${trackPaths.size} tracks"
         }
         val selectedScopeKey = selectedTrackHeaderKey ?: queueScopeHeaderKey
-        pageBinding.textSelectedTrackGroupValue.text =
-            "Folder: ${displayTrackQueueScope(selectedScopeKey)}"
-        pageBinding.textSelectedTrackGroupValue.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if (selectedScopeKey == null) R.color.app_text_secondary else R.color.app_primary
-            )
+        pageBinding.textSelectedTrackGroupValue.text = displayTrackQueueScope(selectedScopeKey)
+        applyChipTone(
+            pageBinding.textSelectedTrackGroupValue,
+            if (selectedScopeKey == null) ChipTone.NEUTRAL else ChipTone.PRIMARY
         )
         val queueModeText = when {
-            trackPaused == true && queueAutoAdvanceEnabled && queueRepeatEnabled -> "Paused | Queue + Repeat"
-            trackPaused == true && queueAutoAdvanceEnabled -> "Paused | Queue Active"
+            trackPaused == true && shuffleEnabled && queueRepeatEnabled -> "Paused | Shuffle | Repeat"
+            trackPaused == true && shuffleEnabled -> "Paused | Shuffle"
+            trackPaused == true && queueRepeatEnabled -> "Paused | Repeat"
             trackPaused == true -> "Paused"
-            queueAutoAdvanceEnabled && queueRepeatEnabled -> "Queue Active | Repeat"
-            queueAutoAdvanceEnabled -> "Queue Active"
-            queueRepeatEnabled -> "Repeat Armed"
+            queueAutoAdvanceEnabled && shuffleEnabled && queueRepeatEnabled -> "Queue | Shuffle | Repeat"
+            queueAutoAdvanceEnabled && shuffleEnabled -> "Queue | Shuffle"
+            queueAutoAdvanceEnabled && queueRepeatEnabled -> "Queue | Repeat"
+            queueAutoAdvanceEnabled -> "Queue"
+            shuffleEnabled -> "Shuffle"
+            queueRepeatEnabled -> "Repeat"
             else -> getString(R.string.queue_mode_single_track)
         }
-        pageBinding.textQueueModeValue.text = "Queue: $queueModeText"
+        pageBinding.textQueueModeValue.text = queueModeText
+        applyChipTone(
+            pageBinding.textQueueModeValue,
+            when {
+                trackPaused == true -> ChipTone.WARNING
+                queueAutoAdvanceEnabled || shuffleEnabled || queueRepeatEnabled -> ChipTone.PRIMARY
+                else -> ChipTone.NEUTRAL
+            }
+        )
+
+        val elapsedMs = trackPositionMs?.coerceAtLeast(0L)
+        val lengthMs = trackLengthMs?.takeIf { it > 0L }
+        pageBinding.textElapsedValue.text = formatElapsed(elapsedMs)
+        pageBinding.textRemainingValue.text = if (lengthMs == null) {
+            getString(R.string.time_unknown)
+        } else {
+            formatRemaining(elapsedMs, lengthMs)
+        }
+        pageBinding.textRemainingValue.visibility = if (lengthMs == null) View.GONE else View.VISIBLE
+        pageBinding.progressTrack.alpha = if (lengthMs == null) 0.35f else 1.0f
+        val progressValue = if (elapsedMs != null && lengthMs != null && lengthMs > 0L) {
+            ((elapsedMs.toDouble() / lengthMs.toDouble()) * 1000.0).toInt().coerceIn(0, 1000)
+        } else {
+            0
+        }
+        pageBinding.progressTrack.progress = progressValue
 
         trackAdapter.items = trackRows
         val selectedTrackRowIndex = trackRows.indexOfFirst { row ->
@@ -1471,9 +1577,8 @@ class MainActivity : AppCompatActivity() {
 
         val canInteract = currentConnectionState == ConnectionState.READY
         val queueScopeKey = resolveTrackQueueScopeKey()
-        val queueTrackCount = queueTracksForScope(queueScopeKey).size
+        val queueTrackCount = activeQueueForScope(queueScopeKey).size
         pageBinding.buttonRefreshTracks.isEnabled = canInteract
-        pageBinding.buttonRefreshNowPlaying.isEnabled = canInteract
         pageBinding.buttonStopTrack.isEnabled = canInteract && (nowPlaying != null || trackPaused == true)
         pageBinding.buttonPlayTrackGroup.isEnabled = canInteract && queueTrackCount > 0
         pageBinding.buttonPreviousTrack.isEnabled = canInteract && queueTrackCount > 0
@@ -1481,40 +1586,26 @@ class MainActivity : AppCompatActivity() {
             canInteract && (nowPlaying != null || trackPaused == true || selectedTrackPath != null)
         pageBinding.buttonNextTrack.isEnabled = canInteract && queueTrackCount > 0
         pageBinding.buttonRepeatQueue.isEnabled = canInteract && queueTrackCount > 0
+        pageBinding.buttonShuffleQueue.isEnabled = canInteract && queueTrackCount > 0
         pageBinding.buttonExpandAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.buttonCollapseAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
-        pageBinding.buttonRefreshVolume.isEnabled = canInteract
-        pageBinding.seekVolume.isEnabled = canInteract
-        pageBinding.buttonTogglePauseTrack.text = if (trackPaused == true) {
-            getString(R.string.resume_track)
-        } else {
-            getString(R.string.play_pause_track)
-        }
-        pageBinding.buttonRepeatQueue.text = if (queueRepeatEnabled) {
-            getString(R.string.repeat_queue_on)
-        } else {
-            getString(R.string.repeat_queue_off)
-        }
-        bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
-    }
-
-    private fun renderStylesPage(pageBinding: PageStylesBinding) {
-        pageBinding.textStylesStatusValue.text = when {
-            visualsStatus.isNotBlank() -> visualsStatus
-            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
-            else -> getString(R.string.track_visual_status_default)
-        }
-        pageBinding.textTrackVisualPolicyValue.text = displayTrackPolicy(trackPolicy)
-        pageBinding.textTrackVisualSelectionValue.text = displaySelectedTrackVisual()
-        pageBinding.textTrackVisualRuntimeValue.text = buildTrackVisualRuntimeSummary()
-        pageBinding.textTrackVisualTrackValue.text = activeTrackPath() ?: getString(R.string.state_none)
-        pageBinding.textTrackVisualTrackValue.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if (activeTrackPath().isNullOrBlank()) R.color.app_text_secondary else R.color.app_text_primary
-            )
+        pageBinding.buttonTogglePauseTrack.icon = AppCompatResources.getDrawable(
+            this,
+            if (trackPaused == true) R.drawable.ic_control_play else R.drawable.ic_control_pause
         )
+        pageBinding.buttonShuffleQueue.backgroundTintList =
+            ContextCompat.getColorStateList(
+                this,
+                if (shuffleEnabled) R.color.app_primary_tint else R.color.app_surface
+            )
+        pageBinding.buttonRepeatQueue.backgroundTintList =
+            ContextCompat.getColorStateList(
+                this,
+                if (queueRepeatEnabled) R.color.app_primary_tint else R.color.app_surface
+            )
+
+        pageBinding.textTrackVisualPolicyValue.text = displayTrackPolicy(trackPolicy)
         applyChipTone(
             pageBinding.textTrackVisualPolicyValue,
             when (trackPolicy) {
@@ -1524,10 +1615,7 @@ class MainActivity : AppCompatActivity() {
                 else -> ChipTone.NEUTRAL
             }
         )
-        applyChipTone(
-            pageBinding.textTrackVisualSelectionValue,
-            if ((trackVisualSelectedId ?: 0) == 0) ChipTone.NEUTRAL else ChipTone.PRIMARY
-        )
+        pageBinding.textTrackVisualRuntimeValue.text = buildTrackVisualRuntimeSummary()
         applyChipTone(
             pageBinding.textTrackVisualRuntimeValue,
             when {
@@ -1538,6 +1626,7 @@ class MainActivity : AppCompatActivity() {
                 else -> ChipTone.NEUTRAL
             }
         )
+        pageBinding.textVisualAssignmentSummaryValue.text = buildVisualAssignmentSummary()
 
         trackVisualAdapter.clear()
         trackVisualAdapter.addAll(trackVisualOptions.map { option -> option.name })
@@ -1550,7 +1639,15 @@ class MainActivity : AppCompatActivity() {
             pageBinding.spinnerTrackVisuals.setSelection(selectedIndex, false)
         }
 
-        val canInteract = currentConnectionState == ConnectionState.READY
+        trackVisualOverrideAdapter.clear()
+        trackVisualOverrideAdapter.add(getString(R.string.visual_override_use_mappings))
+        trackVisualOverrideAdapter.addAll(trackVisualOptions.filter { it.id != 0 }.map { it.name })
+        trackVisualOverrideAdapter.notifyDataSetChanged()
+        val overrideSelection = trackVisualOverrideSelectionForId(sessionOverrideVisualId)
+        if (pageBinding.spinnerTrackVisualOverride.selectedItemPosition != overrideSelection) {
+            pageBinding.spinnerTrackVisualOverride.setSelection(overrideSelection, false)
+        }
+
         pageBinding.buttonRefreshTrackVisuals.isEnabled = canInteract
         pageBinding.buttonPolicyAuto.isEnabled = canInteract
         pageBinding.buttonPolicySaber.isEnabled = canInteract
@@ -1559,6 +1656,8 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonClearTrackVisual.isEnabled = canInteract && (trackVisualSelectedId ?: 0) != 0
         pageBinding.buttonPreviewTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
         pageBinding.buttonStopTrackVisualPreview.isEnabled = canInteract && trackVisualPreviewActive == true
+        pageBinding.buttonAssignTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
+        pageBinding.buttonClearVisualAssignment.isEnabled = canInteract
 
         when (trackPolicy) {
             "visual" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyMusic)
@@ -1567,7 +1666,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderEffectsPage(pageBinding: PageEffectsBinding) {
+    private fun renderEffectsSheet() {
+        val pageBinding = effectsSheetBinding ?: return
         val currentPreset = currentPresetEntry()
         pageBinding.textEffectsStatusValue.text = when {
             currentConnectionState != ConnectionState.READY -> currentConnectionState.name
@@ -1620,7 +1720,8 @@ class MainActivity : AppCompatActivity() {
         suppressVolumeCallbacks = false
     }
 
-    private fun renderLogPage(pageBinding: PageLogBinding) {
+    private fun renderDebugSheet() {
+        val pageBinding = debugSheetBinding ?: return
         pageBinding.textLog.text = buildLogText()
         updateRawCommandControls(pageBinding)
         pageBinding.scrollLog.post {
@@ -1628,7 +1729,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateRawCommandControls(pageBinding: PageLogBinding) {
+    private fun updateRawCommandControls(pageBinding: SheetDebugBinding) {
         val hasCommand = !pageBinding.inputRawCommand.text.isNullOrBlank()
         pageBinding.buttonSendRawCommand.isEnabled =
             currentConnectionState == ConnectionState.READY && hasCommand
@@ -1644,7 +1745,9 @@ class MainActivity : AppCompatActivity() {
         }
         logLines.addLast(line)
         mirrorLogLineToLogcat(line)
-        logPageBinding?.let { renderLogPage(it) }
+        if (debugBottomSheet?.isShowing == true) {
+            renderDebugSheet()
+        }
     }
 
     private fun mirrorLogLineToLogcat(line: String) {
@@ -1740,7 +1843,10 @@ class MainActivity : AppCompatActivity() {
         } else if (state.nowPlaying != null) {
             nowPlaying = state.nowPlaying
         }
+        state.trackActive?.let { trackActive = it }
         state.trackPaused?.let { trackPaused = it }
+        state.positionMs?.let { trackPositionMs = it }
+        state.lengthMs?.let { trackLengthMs = it }
         if (state.nowPlaying != null) {
             selectedTrackPath = state.nowPlaying
             if (selectedTrackHeaderKey == null) {
@@ -1756,6 +1862,7 @@ class MainActivity : AppCompatActivity() {
         state.visualPreviewActive?.let { trackVisualPreviewActive = it }
         if (trackPaths.isNotEmpty()) {
             rebuildTrackRows(ensureCurrentTrackVisible = true)
+            rebuildQueueForCurrentScope(preserveCurrent = true)
         }
         return state
     }
@@ -1838,15 +1945,83 @@ class MainActivity : AppCompatActivity() {
         return SaberCommandResponseParser.tracksForHeader(trackPaths, scopeKey)
     }
 
+    private fun activeQueueForScope(scopeKey: String?): List<String> {
+        if (scopeKey == null) return emptyList()
+        val baseQueue = queueTracksForScope(scopeKey)
+        if (activeQueueOrder.isEmpty() || queueScopeHeaderKey != scopeKey) {
+            return baseQueue
+        }
+        return activeQueueOrder.filter(baseQueue::contains)
+    }
+
+    private fun rebuildQueueForCurrentScope(
+        anchorTrack: String? = activeTrackPath(),
+        preserveCurrent: Boolean
+    ) {
+        val scopeKey = resolveTrackQueueScopeKey()
+        if (scopeKey == null) {
+            activeQueueOrder = emptyList()
+            if (!preserveCurrent) {
+                queueHistory.clear()
+            }
+            return
+        }
+        val queue = queueTracksForScope(scopeKey)
+        if (queue.isEmpty()) {
+            activeQueueOrder = emptyList()
+            queueHistory.clear()
+            return
+        }
+
+        activeQueueOrder = buildQueueOrder(
+            scopeKey = scopeKey,
+            queue = queue,
+            anchorTrack = anchorTrack
+        )
+        queueScopeHeaderKey = scopeKey
+        if (!preserveCurrent) {
+            queueHistory.clear()
+        }
+    }
+
+    private fun buildQueueOrder(
+        scopeKey: String,
+        queue: List<String>,
+        anchorTrack: String?
+    ): List<String> {
+        if (!shuffleEnabled || queue.size <= 1) return queue
+
+        val stableSeed = scopeKey.hashCode().toLong()
+        val shuffled = queue.toMutableList()
+        val anchor = anchorTrack?.takeIf(shuffled::contains)
+        if (anchor != null) {
+            shuffled.remove(anchor)
+        }
+        shuffled.shuffle(Random(stableSeed))
+        return buildList {
+            if (anchor != null) add(anchor)
+            addAll(shuffled)
+        }
+    }
+
+    private fun pushQueueHistory(trackPath: String) {
+        if (queueHistory.lastOrNull() == trackPath) return
+        queueHistory.add(trackPath)
+        if (queueHistory.size > 50) {
+            queueHistory.removeAt(0)
+        }
+    }
+
     private suspend fun advanceQueuedTrackInternal(previousTrackPath: String) {
         val scopeKey = queueScopeHeaderKey ?: resolveTrackQueueScopeKey()
-        val queue = queueTracksForScope(scopeKey)
+        val queue = activeQueueForScope(scopeKey)
         if (scopeKey == null || queue.isEmpty()) {
             queueAutoAdvanceEnabled = false
             renderAll()
             return
         }
 
+        pushQueueHistory(previousTrackPath)
         val currentIndex = queue.indexOf(previousTrackPath)
         var nextIndex = currentIndex + 1
         if (currentIndex < 0) {
@@ -1885,6 +2060,126 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return null
+    }
+
+    private fun selectedTrackVisualOptionFromMusicUi(): SaberCommandResponseParser.TrackVisualOption? {
+        val pageBinding = tracksPageBinding ?: return null
+        return pageBinding.spinnerTrackVisuals.selectedItemPosition
+            .takeIf { it in trackVisualOptions.indices }
+            ?.let(trackVisualOptions::get)
+    }
+
+    private fun trackVisualOverrideIdForPosition(position: Int): Int? {
+        if (position <= 0) return null
+        return trackVisualOptions.filter { it.id != 0 }
+            .getOrNull(position - 1)
+            ?.id
+    }
+
+    private fun trackVisualOverrideSelectionForId(visualId: Int?): Int {
+        if ((visualId ?: 0) <= 0) return 0
+        val options = trackVisualOptions.filter { it.id != 0 }
+        val index = options.indexOfFirst { it.id == visualId }
+        return if (index >= 0) index + 1 else 0
+    }
+
+    private fun selectedAssignmentScopeFromUi(): VisualAssignmentScope {
+        return when (tracksPageBinding?.spinnerVisualAssignmentScope?.selectedItemPosition ?: 0) {
+            0 -> VisualAssignmentScope.TRACK
+            1 -> VisualAssignmentScope.ALBUM
+            2 -> VisualAssignmentScope.CATEGORY
+            else -> VisualAssignmentScope.DEFAULT
+        }
+    }
+
+    private fun assignVisualRuleFromUi(option: SaberCommandResponseParser.TrackVisualOption) {
+        val scope = selectedAssignmentScopeFromUi()
+        val trackPath = activeTrackPath() ?: selectedTrackPath
+        val scopeKey = VisualAssignmentResolver.scopeKeyForTrack(scope, trackPath)
+        if (scopeKey.isNullOrBlank()) {
+            visualsStatus = "Select a track or folder before assigning a visual."
+            renderAll()
+            return
+        }
+        visualAssignmentRules = visualAssignmentRules
+            .filterNot { it.scope == scope && it.scopeKey == scopeKey }
+            .plus(
+                VisualAssignmentRule(
+                    scope = scope,
+                    scopeKey = scopeKey,
+                    visualId = option.id
+                )
+            )
+        visualAssignmentStore.saveRules(visualAssignmentRules)
+        visualsStatus = "Mapped ${option.name} to ${displayAssignmentScope(scope, scopeKey)}"
+        renderAll()
+    }
+
+    private fun clearVisualRuleFromUi() {
+        val scope = selectedAssignmentScopeFromUi()
+        val trackPath = activeTrackPath() ?: selectedTrackPath
+        val scopeKey = VisualAssignmentResolver.scopeKeyForTrack(scope, trackPath)
+        if (scopeKey.isNullOrBlank()) {
+            visualsStatus = "No assignment scope available to clear."
+            renderAll()
+            return
+        }
+        val updatedRules = visualAssignmentRules.filterNot { it.scope == scope && it.scopeKey == scopeKey }
+        if (updatedRules.size == visualAssignmentRules.size) {
+            visualsStatus = "No saved visual mapping for ${displayAssignmentScope(scope, scopeKey)}"
+            renderAll()
+            return
+        }
+        visualAssignmentRules = updatedRules
+        visualAssignmentStore.saveRules(visualAssignmentRules)
+        visualsStatus = "Cleared mapping for ${displayAssignmentScope(scope, scopeKey)}"
+        renderAll()
+    }
+
+    private suspend fun applyEffectiveVisualForTrack(trackPath: String) {
+        val resolution = VisualAssignmentResolver.resolve(
+            trackPath = trackPath,
+            overrideVisualId = sessionOverrideVisualId,
+            rules = visualAssignmentRules
+        )
+        val targetVisualId = resolution.visualId ?: return
+        if (trackVisualSelectedId == targetVisualId) return
+        val option = trackVisualOptions.firstOrNull { it.id == targetVisualId } ?: return
+        setTrackVisualInternal(option)
+    }
+
+    private fun buildVisualAssignmentSummary(): String {
+        val trackPath = activeTrackPath() ?: selectedTrackPath
+        val resolution = VisualAssignmentResolver.resolve(
+            trackPath = trackPath,
+            overrideVisualId = sessionOverrideVisualId,
+            rules = visualAssignmentRules
+        )
+        val visualName = when {
+            (sessionOverrideVisualId ?: 0) > 0 ->
+                trackVisualOptions.firstOrNull { it.id == sessionOverrideVisualId }?.name
+                    ?: "Visual #$sessionOverrideVisualId"
+            resolution.visualId != null ->
+                trackVisualOptions.firstOrNull { it.id == resolution.visualId }?.name
+                    ?: "Visual #${resolution.visualId}"
+            else -> displaySelectedTrackVisual()
+        }
+
+        return when {
+            (sessionOverrideVisualId ?: 0) > 0 -> "Session override: $visualName"
+            resolution.matchedScope != null && resolution.matchedScopeKey != null ->
+                "Mapped ${displayAssignmentScope(resolution.matchedScope, resolution.matchedScopeKey)} -> $visualName"
+            else -> getString(R.string.visual_assignment_default_summary)
+        }
+    }
+
+    private fun displayAssignmentScope(scope: VisualAssignmentScope, scopeKey: String): String {
+        return when (scope) {
+            VisualAssignmentScope.TRACK -> "track ${displayTrackName(scopeKey)}"
+            VisualAssignmentScope.ALBUM -> "album ${SaberCommandResponseParser.trackHeaderLabel(scopeKey) ?: scopeKey}"
+            VisualAssignmentScope.CATEGORY -> "category ${SaberCommandResponseParser.trackHeaderLabel(scopeKey) ?: scopeKey}"
+            VisualAssignmentScope.DEFAULT -> "default playback"
+        }
     }
 
     private fun buildTrackStatus(trackPath: String?): String {
@@ -1947,9 +2242,28 @@ class MainActivity : AppCompatActivity() {
         return trackPath.substringAfterLast('/')
     }
 
+    private fun formatElapsed(positionMs: Long?): String {
+        val seconds = ((positionMs ?: 0L) / 1000L).coerceAtLeast(0L)
+        return formatClock(seconds)
+    }
+
+    private fun formatRemaining(positionMs: Long?, lengthMs: Long?): String {
+        val remainingSeconds = when {
+            lengthMs == null || lengthMs <= 0L -> 0L
+            else -> ((lengthMs - (positionMs ?: 0L)).coerceAtLeast(0L) / 1000L)
+        }
+        return "-${formatClock(remainingSeconds)}"
+    }
+
+    private fun formatClock(totalSeconds: Long): String {
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return String.format("%d:%02d", minutes, seconds)
+    }
+
     private fun displayTrackQueueScope(scopeKey: String?): String {
         return SaberCommandResponseParser.trackHeaderLabel(scopeKey)
-            ?: getString(R.string.state_none)
+            ?: getString(R.string.music_scope_none)
     }
 
     private fun dp(value: Int): Int {

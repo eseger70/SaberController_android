@@ -10,6 +10,8 @@ object SaberCommandResponseParser {
         val nowPlaying: String? = null,
         val trackActive: Boolean? = null,
         val trackPaused: Boolean? = null,
+        val positionMs: Long? = null,
+        val lengthMs: Long? = null,
         val policy: String? = null,
         val sessionMode: String? = null,
         val visualSelectedId: Int? = null,
@@ -315,6 +317,17 @@ object SaberCommandResponseParser {
         return trackHeaderKeysForPath(trackPath).lastOrNull()
     }
 
+    fun categoryKeyForPath(trackPath: String?): String? {
+        val segments = visibleTrackSegments(trackPath.orEmpty())
+        val directories = segments.dropLast(1)
+        return directories.firstOrNull()
+    }
+
+    fun albumKeyForPath(trackPath: String?): String? {
+        return deepestTrackHeaderKey(trackPath)
+            ?.takeUnless { it == ROOT_TRACKS_HEADER_KEY }
+    }
+
     fun trackHeaderLabel(headerKey: String?): String? {
         if (headerKey.isNullOrBlank()) return null
         if (headerKey == ROOT_TRACKS_HEADER_KEY) return "Tracks"
@@ -390,6 +403,8 @@ object SaberCommandResponseParser {
         val nowPlaying = parseNowPlaying(response)
         val trackActive = fields["TRACK_ACTIVE"]?.toBooleanFlag()
         val trackPaused = fields["TRACK_PAUSED"]?.toBooleanFlag()
+        val positionMs = fields["TRACK_POS_MS"]?.toLongOrNull()
+        val lengthMs = fields["TRACK_LENGTH_MS"]?.toLongOrNull()
         val policy = fields["TRACK_POLICY"]?.ifBlank { null }
         val sessionMode = fields["TRACK_SESSION_MODE"]?.ifBlank { null }
         val visualSelectedId = fields["TRACK_VISUAL_SELECTED"]?.toIntOrNull()
@@ -405,6 +420,8 @@ object SaberCommandResponseParser {
             nowPlaying == null &&
             trackActive == null &&
             trackPaused == null &&
+            positionMs == null &&
+            lengthMs == null &&
             policy == null &&
             sessionMode == null &&
             visualSelectedId == null &&
@@ -423,6 +440,8 @@ object SaberCommandResponseParser {
             nowPlaying = nowPlaying,
             trackActive = trackActive,
             trackPaused = trackPaused,
+            positionMs = positionMs,
+            lengthMs = lengthMs,
             policy = policy,
             sessionMode = sessionMode,
             visualSelectedId = visualSelectedId,

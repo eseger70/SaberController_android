@@ -2,6 +2,14 @@
 
 Android BLE controller app for ProffieOS-based saber control.
 
+Validated baseline:
+
+- Android app repo: this repository
+- Firmware repo: `C:\Backup\Eric\sandbox\saber\ProffieOS_v7.15`
+- Firmware branch: `track_player_000`
+- Minimum validated firmware commit: `d9fe674`
+- Full baseline notes: [dev_docs/baseline.md](dev_docs/baseline.md)
+
 ## Scope (Current Iteration)
 
 - Use paired `FEASYCOM` first, then scan as fallback
@@ -141,6 +149,9 @@ The app mirrors its in-app log panel to logcat under these tags:
 - Presets whose names start with `_sub_` are treated as non-selectable category headers in the UI.
 - If a header preset is currently selected, the app blocks ignition until a real preset is chosen.
 - The `Log` tab raw command console uses the same BLE transport and framed response parsing as the rest of the app, so it is the preferred surface for testing new firmware commands before dedicated UI is added.
+- Pause/resume baseline is bookmark-based:
+  - `ta` stores file + position and frees the player
+  - `tr` reopens the track from the saved position
 
 ## Troubleshooting
 

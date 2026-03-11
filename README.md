@@ -52,8 +52,8 @@ Supported app commands:
   - `pt <index>`
   - `st`
   - `gt`
-  - `tpa`
-  - `trs`
+  - `ta`
+  - `tr`
   - `ttp`
   - `tvl`
   - `tvg`
@@ -134,7 +134,7 @@ The app mirrors its in-app log panel to logcat under these tags:
 - Command sending uses a serialized command lock with timeout/retry behavior for awaited responses.
 - Track browsing is currently path-based because the current firmware command surface is path-based.
 - Folder playback queues are app-driven; the app advances to the next track in the selected folder/category by polling `gt` silently while queued playback is active.
-- Track pause/resume is firmware-backed via `pause_track`, `resume_track`, and `toggle_track_pause`.
+- Track pause/resume is firmware-backed via `pause_track`, `resume_track`, and `toggle_track_pause`. The app uses compact aliases `ta` and `tr`.
 - Track visuals are implemented firmware-side. The app no longer switches presets before playback.
 - `Auto` preserves saber behavior while the blade is on and uses the selected track visual while the blade is off.
 - `Music` requires the blade to be off. If the blade is on, playback is rejected with `TRACK_VISUAL_REJECTED=blade_on`.

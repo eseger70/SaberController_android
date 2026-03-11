@@ -1156,7 +1156,7 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun pauseTrackInternal() {
         val result = runCommand(
-            command = "tpa",
+            command = "ta",
             awaitResponse = true,
             successLog = false
         )
@@ -1175,7 +1175,7 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun resumeTrackInternal() {
         val result = runCommand(
-            command = "trs",
+            command = "tr",
             awaitResponse = true,
             successLog = false
         )

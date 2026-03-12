@@ -24,17 +24,28 @@ cd C:\Backup\Eric\sandbox\android\SaberController
 
 ## 3. Capture device screenshots
 
-Use ADB screenshots instead of phone-to-PC email loops:
+Use the repo-local capture script instead of manual phone-to-PC loops:
 
 ```powershell
 cd C:\Backup\Eric\sandbox\android\SaberController
-.\.tools\android-sdk\platform-tools\adb.exe shell screencap -p /sdcard/Download/saber_ui.png
-.\.tools\android-sdk\platform-tools\adb.exe pull /sdcard/Download/saber_ui.png .\dev_docs\captures\saber_ui.png
+powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_screenshot.ps1 -Name music_playing
 ```
 
-If `dev_docs\captures` does not exist yet, create it first.
+By default this writes to `dev_docs\captures`.
 
 ## 4. Compare before / after states
+
+Use the compare script to generate a diff image and a pixel-difference summary:
+
+```powershell
+cd C:\Backup\Eric\sandbox\android\SaberController
+powershell -ExecutionPolicy Bypass -File .\scripts\compare_ui_screenshots.ps1 `
+  -Baseline .\dev_docs\captures\baseline\music_playing.png `
+  -Candidate .\dev_docs\captures\candidate\music_playing.png `
+  -FailPercentThreshold 0.5
+```
+
+This creates a `_diff.png` artifact next to the candidate screenshot unless `-DiffOutput` is provided.
 
 For repeatable visual checks, keep named screenshots for the major states:
 
@@ -48,6 +59,14 @@ For repeatable visual checks, keep named screenshots for the major states:
 - `music_shuffle_repeat`
 - `effects_sheet`
 - `debug_sheet`
+
+Suggested directory structure:
+
+```text
+dev_docs/captures/baseline/
+dev_docs/captures/candidate/
+dev_docs/captures/diff/
+```
 
 Use a consistent naming scheme:
 
@@ -66,9 +85,15 @@ Use these before making another round of layout tweaks:
 - Color picker / theme preview:
   - verify the Rey gold token and contrast on chips, cards, and transport icons
 
-## 6. Recommended automated next step
+## 6. Current automation baseline
 
-If UI iteration becomes frequent, add screenshot tests with a JVM screenshot tool such as `Roborazzi`.
+The current automated workflow is:
+
+- XML preview
+- Layout Inspector
+- ADB logcat
+- `capture_ui_screenshot.ps1`
+- `compare_ui_screenshots.ps1`
 
 Suggested screenshot coverage:
 
@@ -78,11 +103,4 @@ Suggested screenshot coverage:
 - effects bottom sheet open
 - debug bottom sheet open
 
-This repo does not add that dependency yet. The current workflow is:
-
-- XML preview
-- Layout Inspector
-- ADB screenshots
-- ADB logcat
-
-That keeps the build stable while still making iteration much faster.
+This keeps the build stable while still making iteration much faster.

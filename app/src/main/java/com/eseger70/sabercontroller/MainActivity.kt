@@ -139,25 +139,25 @@ class MainActivity : AppCompatActivity() {
     private val trackVisualAdapter by lazy {
         ArrayAdapter<String>(
             this,
-            android.R.layout.simple_spinner_item,
+            R.layout.item_spinner_selected,
             mutableListOf<String>()
         ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
     }
     private val trackVisualOverrideAdapter by lazy {
         ArrayAdapter<String>(
             this,
-            android.R.layout.simple_spinner_item,
+            R.layout.item_spinner_selected,
             mutableListOf<String>()
         ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
     }
     private val visualAssignmentScopeAdapter by lazy {
         ArrayAdapter(
             this,
-            android.R.layout.simple_spinner_item,
+            R.layout.item_spinner_selected,
             mutableListOf(
                 getString(R.string.visual_assignment_scope_track),
                 getString(R.string.visual_assignment_scope_album),
@@ -165,7 +165,7 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.visual_assignment_scope_default)
             )
         ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
     }
 

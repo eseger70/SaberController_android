@@ -96,6 +96,25 @@ If `adb` is on `PATH`:
 adb logcat -v time SaberCtrl:D SaberCtrlTx:I SaberCtrlRx:I SaberCtrlFrm:I SaberCtrlWarn:W *:S
 ```
 
+## Screenshot capture and compare
+
+Capture a named UI screenshot directly from the connected phone:
+
+```powershell
+cd C:\Backup\Eric\sandbox\android\SaberController
+powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_screenshot.ps1 -Name music_playing
+```
+
+Compare a candidate screenshot to a saved baseline:
+
+```powershell
+cd C:\Backup\Eric\sandbox\android\SaberController
+powershell -ExecutionPolicy Bypass -File .\scripts\compare_ui_screenshots.ps1 `
+  -Baseline .\dev_docs\captures\baseline\music_playing.png `
+  -Candidate .\dev_docs\captures\candidate\music_playing.png `
+  -FailPercentThreshold 0.5
+```
+
 If using the repo-local copy:
 
 ```powershell

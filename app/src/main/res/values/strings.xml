@@ -88,8 +88,10 @@
     <string name="track_visual_hint">Auto preserves saber behavior while the blade is on and uses the selected music visual while the blade is off. Saber always preserves the active saber state. Music requires the blade to be off and rejects playback when the blade is already on.</string>
     <string name="track_visual_policy_label">Playback mode</string>
     <string name="track_visual_selected_label">Selected track visual</string>
+    <string name="track_visual_override_label">Temporary override</string>
     <string name="track_visual_runtime_label">Runtime state</string>
     <string name="track_visual_track_label">Current track</string>
+    <string name="visual_assignment_scope_label">Assignment scope</string>
     <string name="track_visual_policy_title">Playback policy</string>
     <string name="track_visual_policy_hint">Choose how the firmware should behave when you start track playback.</string>
     <string name="track_policy_auto">Auto</string>

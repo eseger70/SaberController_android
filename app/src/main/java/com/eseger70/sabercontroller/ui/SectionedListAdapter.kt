@@ -16,6 +16,7 @@ import java.util.Locale
 class SectionedListAdapter<T>(
     context: Context,
     private val labelProvider: (T) -> String,
+    private val subtitleProvider: (T) -> String? = { null },
     private val headerProvider: (T) -> Boolean,
     private val enabledProvider: (T) -> Boolean,
     private val levelProvider: (T) -> Int = { 0 },
@@ -65,6 +66,7 @@ class SectionedListAdapter<T>(
             false
         )
         val textView = itemView.findViewById<TextView>(R.id.textRowLabel)
+        val subtitleView = itemView.findViewById<TextView>(R.id.textRowSubtitle)
         val indicatorView = itemView.findViewById<TextView>(R.id.textRowIndicator)
         val countView = itemView.findViewById<TextView>(R.id.textRowCount)
         val container = itemView.findViewById<View>(R.id.rowContainer)
@@ -88,6 +90,16 @@ class SectionedListAdapter<T>(
         )
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (isHeader) 14f else 16f)
         textView.letterSpacing = if (isHeader) 0.02f else 0.01f
+        val subtitle = subtitleProvider(item)?.takeIf { it.isNotBlank() }
+        if (subtitle != null) {
+            subtitleView.visibility = View.VISIBLE
+            subtitleView.text = subtitle
+            subtitleView.alpha = if (isEnabled || isHeader) 0.95f else 0.6f
+            subtitleView.setTextColor(secondaryTextColor)
+        } else {
+            subtitleView.visibility = View.GONE
+            subtitleView.text = ""
+        }
         val leftPadding = (if (isHeader) horizontalPadding else nestedPadding) + (level * indentStep)
         container.setPadding(
             leftPadding,

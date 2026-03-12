@@ -14,43 +14,23 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/music_visuals_sheet_title"
+            android:text="@string/assign_visual_title"
             android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
             android:textColor="@color/app_text_primary" />
 
         <TextView
-            android:id="@+id/textTrackVisualPolicyValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_chip_primary"
-            android:paddingStart="10dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="6dp"
-            android:text="@string/track_policy_auto"
-            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
-            android:textColor="@color/app_chip_primary_text" />
-
-        <TextView
-            android:id="@+id/textTrackVisualRuntimeValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_chip_neutral"
-            android:paddingStart="12dp"
-            android:paddingTop="8dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="8dp"
-            android:text="@string/track_visual_status_default"
-            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-            android:textColor="@color/app_header_text" />
+            android:layout_marginTop="10dp"
+            android:text="@string/track_visual_policy_label"
+            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            android:textColor="@color/app_text_secondary" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/toggleTrackPolicy"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             app:selectionRequired="true"
             app:singleSelection="true">
 
@@ -82,45 +62,56 @@
                 android:textColor="@color/app_text_primary" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
-        <Spinner
-            android:id="@+id/spinnerTrackVisuals"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/visual_target_label"
+            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            android:textColor="@color/app_text_secondary" />
+
+        <TextView
+            android:id="@+id/textVisualTargetValue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:background="@drawable/bg_chip_neutral"
-            android:popupBackground="@drawable/bg_spinner_popup" />
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="8dp"
+            android:text="@string/visual_target_none"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="@color/app_header_text" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="12dp"
             android:text="@string/track_visual_selected_label"
             android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
             android:textColor="@color/app_text_secondary" />
 
+        <Spinner
+            android:id="@+id/spinnerTrackVisuals"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_chip_neutral"
+            android:popupBackground="@drawable/bg_spinner_popup" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonRefreshTrackVisuals"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/refresh_short"
-                android:textColor="@color/app_text_primary"
-                app:backgroundTint="@color/app_surface_alt"
-                app:icon="@android:drawable/ic_popup_sync"
-                app:iconTint="@color/app_text_primary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonApplyTrackVisual"
                 style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_weight="1"
                 android:text="@string/apply_short"
                 android:textColor="@color/app_text_primary"
                 app:backgroundTint="@color/app_surface_alt" />
@@ -128,68 +119,11 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonClearTrackVisual"
                 style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
+                android:layout_weight="1"
                 android:text="@string/clear_visual"
-                android:textColor="@color/app_text_primary"
-                app:backgroundTint="@color/app_surface_alt" />
-        </LinearLayout>
-
-        <Spinner
-            android:id="@+id/spinnerTrackVisualOverride"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_chip_neutral"
-            android:popupBackground="@drawable/bg_spinner_popup" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/track_visual_override_label"
-            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
-            android:textColor="@color/app_text_secondary" />
-
-        <Spinner
-            android:id="@+id/spinnerVisualAssignmentScope"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_chip_neutral"
-            android:popupBackground="@drawable/bg_spinner_popup" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/visual_assignment_scope_label"
-            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
-            android:textColor="@color/app_text_secondary" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonAssignTrackVisual"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/assign_short"
-                android:textColor="@color/app_text_primary"
-                app:backgroundTint="@color/app_surface_alt" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonClearVisualAssignment"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/clear_short"
                 android:textColor="@color/app_text_primary"
                 app:backgroundTint="@color/app_surface_alt" />
         </LinearLayout>
@@ -203,8 +137,9 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonPreviewTrackVisual"
                 style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:text="@string/preview_short"
                 android:textColor="@color/app_text_primary"
                 app:backgroundTint="@color/app_surface_alt"
@@ -214,10 +149,70 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonStopTrackVisualPreview"
                 style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
+                android:layout_weight="1"
                 android:text="@string/stop_preview_short"
+                android:textColor="@color/app_text_primary"
+                app:backgroundTint="@color/app_surface_alt" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonAssignTrackVisual"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/assign_to_selection"
+                android:textColor="@color/app_on_primary"
+                app:backgroundTint="@color/app_primary"
+                app:cornerRadius="16dp"
+                app:icon="@drawable/ic_control_effects"
+                app:iconTint="@color/app_on_primary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonClearVisualAssignment"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/clear_selection_assignment"
+                android:textColor="@color/app_text_primary"
+                app:backgroundTint="@color/app_surface_alt" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonAssignDefaultVisual"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/set_default_visual"
+                android:textColor="@color/app_text_primary"
+                app:backgroundTint="@color/app_surface_alt" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonClearDefaultVisual"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/clear_default_visual"
                 android:textColor="@color/app_text_primary"
                 app:backgroundTint="@color/app_surface_alt" />
         </LinearLayout>
@@ -226,7 +221,7 @@
             android:id="@+id/textVisualAssignmentSummaryValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="12dp"
             android:background="@drawable/bg_chip_neutral"
             android:paddingStart="12dp"
             android:paddingTop="8dp"

@@ -37,15 +37,6 @@
                     android:text="@string/app_name"
                     android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                     android:textColor="@color/app_text_primary" />
-
-                <TextView
-                    android:id="@+id/textHeaderSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/app_shell_subtitle"
-                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                    android:textColor="@color/app_text_secondary" />
             </LinearLayout>
 
             <TextView
@@ -65,6 +56,21 @@
                 android:textColor="@color/app_header_text" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonConnect"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:layout_marginEnd="8dp"
+                android:minWidth="0dp"
+                android:minHeight="42dp"
+                android:text="@string/connect"
+                android:textColor="@color/app_on_primary"
+                app:backgroundTint="@color/app_primary"
+                app:cornerRadius="16dp"
+                app:icon="@android:drawable/stat_sys_data_bluetooth"
+                app:iconTint="@color/app_on_primary" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonDebug"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="48dp"
@@ -82,42 +88,6 @@
                 app:iconPadding="0dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonConnect"
-            style="@style/Widget.Material3.Button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:minHeight="42dp"
-            android:text="@string/connect"
-            android:textColor="@color/app_on_primary"
-            app:backgroundTint="@color/app_primary"
-            app:cornerRadius="16dp"
-            app:icon="@android:drawable/stat_sys_data_bluetooth"
-            app:iconTint="@color/app_on_primary" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonDisconnect"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:minHeight="42dp"
-            android:text="@string/disconnect"
-            android:textColor="@color/app_text_primary"
-            app:cornerRadius="16dp"
-            app:icon="@android:drawable/ic_menu_close_clear_cancel"
-            app:iconTint="@color/app_text_primary"
-            app:strokeColor="@color/app_outline" />
-    </LinearLayout>
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"

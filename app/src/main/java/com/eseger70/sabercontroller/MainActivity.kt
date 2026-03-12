@@ -117,6 +117,7 @@ class MainActivity : AppCompatActivity() {
         SectionedListAdapter<SaberCommandResponseParser.TrackRow>(
             context = this,
             labelProvider = { row -> row.label },
+            subtitleProvider = { row -> trackRowSubtitle(row) },
             headerProvider = { row -> row is SaberCommandResponseParser.TrackRow.Header },
             enabledProvider = { row ->
                 row is SaberCommandResponseParser.TrackRow.Track ||
@@ -141,29 +142,6 @@ class MainActivity : AppCompatActivity() {
             this,
             R.layout.item_spinner_selected,
             mutableListOf<String>()
-        ).apply {
-            setDropDownViewResource(R.layout.item_spinner_dropdown)
-        }
-    }
-    private val trackVisualOverrideAdapter by lazy {
-        ArrayAdapter<String>(
-            this,
-            R.layout.item_spinner_selected,
-            mutableListOf<String>()
-        ).apply {
-            setDropDownViewResource(R.layout.item_spinner_dropdown)
-        }
-    }
-    private val visualAssignmentScopeAdapter by lazy {
-        ArrayAdapter(
-            this,
-            R.layout.item_spinner_selected,
-            mutableListOf(
-                getString(R.string.visual_assignment_scope_track),
-                getString(R.string.visual_assignment_scope_album),
-                getString(R.string.visual_assignment_scope_category),
-                getString(R.string.visual_assignment_scope_default)
-            )
         ).apply {
             setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
@@ -269,13 +247,11 @@ class MainActivity : AppCompatActivity() {
     private fun wireCommonUi() {
         binding.buttonConnect.setOnClickListener {
             runWithBlePermissions {
-                bleManager.connectToTarget()
-            }
-        }
-
-        binding.buttonDisconnect.setOnClickListener {
-            runWithBlePermissions {
-                bleManager.disconnect()
+                if (currentConnectionState == ConnectionState.DISCONNECTED) {
+                    bleManager.connectToTarget()
+                } else {
+                    bleManager.disconnect()
+                }
             }
         }
 
@@ -474,6 +450,7 @@ class MainActivity : AppCompatActivity() {
         pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             when (val row = trackRows.getOrNull(position)) {
                 is SaberCommandResponseParser.TrackRow.Header -> {
+                    selectedTrackPath = null
                     selectedTrackHeaderKey = row.key
                     toggleTrackHeader(row.key)
                 }
@@ -541,12 +518,6 @@ class MainActivity : AppCompatActivity() {
         if (sheetBinding.spinnerTrackVisuals.adapter !== trackVisualAdapter) {
             sheetBinding.spinnerTrackVisuals.adapter = trackVisualAdapter
         }
-        if (sheetBinding.spinnerTrackVisualOverride.adapter !== trackVisualOverrideAdapter) {
-            sheetBinding.spinnerTrackVisualOverride.adapter = trackVisualOverrideAdapter
-        }
-        if (sheetBinding.spinnerVisualAssignmentScope.adapter !== visualAssignmentScopeAdapter) {
-            sheetBinding.spinnerVisualAssignmentScope.adapter = visualAssignmentScopeAdapter
-        }
 
         sheetBinding.toggleTrackPolicy.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
@@ -556,11 +527,6 @@ class MainActivity : AppCompatActivity() {
                     R.id.buttonPolicySaber -> launchBleTask { setTrackPolicyInternal("preserve") }
                     R.id.buttonPolicyMusic -> launchBleTask { setTrackPolicyInternal("visual") }
                 }
-            }
-        }
-        sheetBinding.buttonRefreshTrackVisuals.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { refreshTrackVisualOptionsInternal() }
             }
         }
         sheetBinding.buttonApplyTrackVisual.setOnClickListener {
@@ -586,27 +552,26 @@ class MainActivity : AppCompatActivity() {
         }
         sheetBinding.buttonAssignTrackVisual.setOnClickListener {
             val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
-            assignVisualRuleFromUi(option)
+            assignVisualRuleToSelectedTarget(option)
         }
         sheetBinding.buttonClearVisualAssignment.setOnClickListener {
-            clearVisualRuleFromUi()
+            clearVisualRuleForSelectedTarget()
         }
-        sheetBinding.spinnerTrackVisualOverride.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    sessionOverrideVisualId = trackVisualOverrideIdForPosition(position)
-                    renderAll()
-                }
+        sheetBinding.buttonAssignDefaultVisual.setOnClickListener {
+            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
+            assignDefaultVisualRule(option)
+        }
+        sheetBinding.buttonClearDefaultVisual.setOnClickListener {
+            clearDefaultVisualRule()
+        }
 
-                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        if (trackVisualOptions.isEmpty()) {
+            runWithBlePermissions {
+                launchBleTask { refreshTrackVisualOptionsInternal() }
             }
-
-        renderMusicVisualsSheet()
+        } else {
+            renderMusicVisualsSheet()
+        }
         musicVisualsBottomSheet?.show()
     }
 
@@ -679,7 +644,7 @@ class MainActivity : AppCompatActivity() {
                     bleManager.connectionState.collect { state ->
                         val previous = currentConnectionState
                         currentConnectionState = state
-                        binding.textConnectionStateValue.text = state.name
+                        binding.textConnectionStateValue.text = displayConnectionState(state)
                         applyChipTone(
                             binding.textConnectionStateValue,
                             when (state) {
@@ -688,8 +653,20 @@ class MainActivity : AppCompatActivity() {
                                 else -> ChipTone.WARNING
                             }
                         )
-                        binding.buttonConnect.isEnabled = state == ConnectionState.DISCONNECTED
-                        binding.buttonDisconnect.isEnabled = state != ConnectionState.DISCONNECTED
+                        binding.buttonConnect.text = if (state == ConnectionState.DISCONNECTED) {
+                            getString(R.string.connect)
+                        } else {
+                            getString(R.string.disconnect)
+                        }
+                        binding.buttonConnect.icon = AppCompatResources.getDrawable(
+                            this@MainActivity,
+                            if (state == ConnectionState.DISCONNECTED) {
+                                android.R.drawable.stat_sys_data_bluetooth
+                            } else {
+                                android.R.drawable.ic_menu_close_clear_cancel
+                            }
+                        )
+                        binding.buttonConnect.isEnabled = state != ConnectionState.CONNECTING
                         renderAll()
 
                         if (state == ConnectionState.READY && previous != ConnectionState.READY) {
@@ -1471,12 +1448,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderSaberPage(pageBinding: PageSaberBinding) {
         val currentPreset = currentPresetEntry()
-        pageBinding.textSaberStatusValue.text = when {
-            saberStatus.isNotBlank() -> saberStatus
-            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
-            currentPreset?.isHeader == true -> "Header preset selected. Choose a blade preset to ignite."
-            else -> "Ready"
-        }
         pageBinding.textLastStateValue.text = when (bladeState) {
             true -> "ON (1)"
             false -> "OFF (0)"
@@ -1526,20 +1497,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderTracksPage(pageBinding: PageTracksBinding) {
-        pageBinding.textTrackStatusValue.text = when {
-            trackStatus.isNotBlank() -> trackStatus
-            currentConnectionState != ConnectionState.READY -> currentConnectionState.name
-            else -> "Ready"
-        }
-        applyChipTone(
-            pageBinding.textTrackStatusValue,
-            when {
-                currentConnectionState != ConnectionState.READY -> ChipTone.WARNING
-                trackPaused == true -> ChipTone.WARNING
-                trackActive == true -> ChipTone.SUCCESS
-                else -> ChipTone.NEUTRAL
-            }
-        )
         pageBinding.textNowPlayingValue.text = activeTrackPath()?.let(::displayTrackName)
             ?: getString(R.string.state_none)
         pageBinding.textNowPlayingValue.setTextColor(
@@ -1558,28 +1515,6 @@ class MainActivity : AppCompatActivity() {
         applyChipTone(
             pageBinding.textSelectedTrackGroupValue,
             if (selectedScopeKey == null) ChipTone.NEUTRAL else ChipTone.PRIMARY
-        )
-        val queueModeText = when {
-            trackPaused == true && shuffleEnabled && queueRepeatEnabled -> "Paused | Shuffle | Repeat"
-            trackPaused == true && shuffleEnabled -> "Paused | Shuffle"
-            trackPaused == true && queueRepeatEnabled -> "Paused | Repeat"
-            trackPaused == true -> "Paused"
-            queueAutoAdvanceEnabled && shuffleEnabled && queueRepeatEnabled -> "Queue | Shuffle | Repeat"
-            queueAutoAdvanceEnabled && shuffleEnabled -> "Queue | Shuffle"
-            queueAutoAdvanceEnabled && queueRepeatEnabled -> "Queue | Repeat"
-            queueAutoAdvanceEnabled -> "Queue"
-            shuffleEnabled -> "Shuffle"
-            queueRepeatEnabled -> "Repeat"
-            else -> getString(R.string.queue_mode_single_track)
-        }
-        pageBinding.textQueueModeValue.text = queueModeText
-        applyChipTone(
-            pageBinding.textQueueModeValue,
-            when {
-                trackPaused == true -> ChipTone.WARNING
-                queueAutoAdvanceEnabled || shuffleEnabled || queueRepeatEnabled -> ChipTone.PRIMARY
-                else -> ChipTone.NEUTRAL
-            }
         )
 
         val elapsedMs = trackPositionMs?.coerceAtLeast(0L)
@@ -1643,34 +1578,18 @@ class MainActivity : AppCompatActivity() {
                 this,
                 if (queueRepeatEnabled) R.color.app_primary_tint else R.color.app_surface
             )
-
-        pageBinding.textMusicVisualSummaryValue.text = buildMusicVisualSummary()
     }
 
     private fun renderMusicVisualsSheet() {
         val pageBinding = musicVisualsSheetBinding ?: return
         val canInteract = currentConnectionState == ConnectionState.READY
+        val target = selectedVisualAssignmentTarget()
 
-        pageBinding.textTrackVisualPolicyValue.text = displayTrackPolicy(trackPolicy)
+        pageBinding.textVisualTargetValue.text = target?.label
+            ?: getString(R.string.visual_target_none)
         applyChipTone(
-            pageBinding.textTrackVisualPolicyValue,
-            when (trackPolicy) {
-                "visual" -> ChipTone.SUCCESS
-                "preserve" -> ChipTone.WARNING
-                "auto" -> ChipTone.PRIMARY
-                else -> ChipTone.NEUTRAL
-            }
-        )
-        pageBinding.textTrackVisualRuntimeValue.text = buildTrackVisualRuntimeSummary()
-        applyChipTone(
-            pageBinding.textTrackVisualRuntimeValue,
-            when {
-                trackVisualPreviewActive == true -> ChipTone.SUCCESS
-                trackVisualActive == true -> ChipTone.SUCCESS
-                trackSessionMode == "preserve" -> ChipTone.WARNING
-                trackSessionMode == "visual" -> ChipTone.PRIMARY
-                else -> ChipTone.NEUTRAL
-            }
+            pageBinding.textVisualTargetValue,
+            if (target == null) ChipTone.NEUTRAL else ChipTone.PRIMARY
         )
         pageBinding.textVisualAssignmentSummaryValue.text = buildVisualAssignmentSummary()
 
@@ -1685,16 +1604,6 @@ class MainActivity : AppCompatActivity() {
             pageBinding.spinnerTrackVisuals.setSelection(selectedIndex, false)
         }
 
-        trackVisualOverrideAdapter.clear()
-        trackVisualOverrideAdapter.add(getString(R.string.visual_override_use_mappings))
-        trackVisualOverrideAdapter.addAll(trackVisualOptions.filter { it.id != 0 }.map { it.name })
-        trackVisualOverrideAdapter.notifyDataSetChanged()
-        val overrideSelection = trackVisualOverrideSelectionForId(sessionOverrideVisualId)
-        if (pageBinding.spinnerTrackVisualOverride.selectedItemPosition != overrideSelection) {
-            pageBinding.spinnerTrackVisualOverride.setSelection(overrideSelection, false)
-        }
-
-        pageBinding.buttonRefreshTrackVisuals.isEnabled = canInteract
         pageBinding.buttonPolicyAuto.isEnabled = canInteract
         pageBinding.buttonPolicySaber.isEnabled = canInteract
         pageBinding.buttonPolicyMusic.isEnabled = canInteract
@@ -1702,8 +1611,11 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonClearTrackVisual.isEnabled = canInteract && (trackVisualSelectedId ?: 0) != 0
         pageBinding.buttonPreviewTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
         pageBinding.buttonStopTrackVisualPreview.isEnabled = canInteract && trackVisualPreviewActive == true
-        pageBinding.buttonAssignTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
-        pageBinding.buttonClearVisualAssignment.isEnabled = canInteract
+        pageBinding.buttonAssignTrackVisual.isEnabled =
+            canInteract && trackVisualOptions.isNotEmpty() && target != null
+        pageBinding.buttonClearVisualAssignment.isEnabled = canInteract && target != null
+        pageBinding.buttonAssignDefaultVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
+        pageBinding.buttonClearDefaultVisual.isEnabled = canInteract && defaultVisualRule() != null
 
         when (trackPolicy) {
             "visual" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyMusic)
@@ -2115,70 +2027,151 @@ class MainActivity : AppCompatActivity() {
             ?.let(trackVisualOptions::get)
     }
 
-    private fun trackVisualOverrideIdForPosition(position: Int): Int? {
-        if (position <= 0) return null
-        return trackVisualOptions.filter { it.id != 0 }
-            .getOrNull(position - 1)
-            ?.id
+    private data class VisualAssignmentTarget(
+        val scope: VisualAssignmentScope,
+        val scopeKey: String,
+        val label: String
+    )
+
+    private fun selectedVisualAssignmentTarget(): VisualAssignmentTarget? {
+        selectedTrackPath?.let { path ->
+            return VisualAssignmentTarget(
+                scope = VisualAssignmentScope.TRACK,
+                scopeKey = path,
+                label = displayAssignmentScope(VisualAssignmentScope.TRACK, path)
+            )
+        }
+
+        val headerKey = selectedTrackHeaderKey
+            ?.takeUnless(SaberCommandResponseParser::isRootTrackHeaderKey)
+            ?: return null
+        val scope = if (headerKey.contains('/')) {
+            VisualAssignmentScope.ALBUM
+        } else {
+            VisualAssignmentScope.CATEGORY
+        }
+        return VisualAssignmentTarget(
+            scope = scope,
+            scopeKey = headerKey,
+            label = displayAssignmentScope(scope, headerKey)
+        )
     }
 
-    private fun trackVisualOverrideSelectionForId(visualId: Int?): Int {
-        if ((visualId ?: 0) <= 0) return 0
-        val options = trackVisualOptions.filter { it.id != 0 }
-        val index = options.indexOfFirst { it.id == visualId }
-        return if (index >= 0) index + 1 else 0
+    private fun visualNameForId(visualId: Int?): String? {
+        val id = visualId ?: return null
+        return trackVisualOptions.firstOrNull { it.id == id }?.name ?: "Visual #$id"
     }
 
-    private fun selectedAssignmentScopeFromUi(): VisualAssignmentScope {
-        return when (musicVisualsSheetBinding?.spinnerVisualAssignmentScope?.selectedItemPosition ?: 0) {
-            0 -> VisualAssignmentScope.TRACK
-            1 -> VisualAssignmentScope.ALBUM
-            2 -> VisualAssignmentScope.CATEGORY
-            else -> VisualAssignmentScope.DEFAULT
+    private fun explicitVisualRule(
+        scope: VisualAssignmentScope,
+        scopeKey: String?
+    ): VisualAssignmentRule? {
+        if (scopeKey.isNullOrBlank()) return null
+        return visualAssignmentRules.firstOrNull { it.scope == scope && it.scopeKey == scopeKey }
+    }
+
+    private fun defaultVisualRule(): VisualAssignmentRule? {
+        val defaultKey = VisualAssignmentResolver.scopeKeyForTrack(VisualAssignmentScope.DEFAULT, null)
+        return explicitVisualRule(VisualAssignmentScope.DEFAULT, defaultKey)
+    }
+
+    private fun explicitVisualNameForRow(row: SaberCommandResponseParser.TrackRow): String? {
+        return when (row) {
+            is SaberCommandResponseParser.TrackRow.Track -> {
+                explicitVisualRule(VisualAssignmentScope.TRACK, row.path)?.visualId?.let(::visualNameForId)
+            }
+            is SaberCommandResponseParser.TrackRow.Header -> {
+                if (SaberCommandResponseParser.isRootTrackHeaderKey(row.key)) {
+                    null
+                } else {
+                    val scope = if (row.key.contains('/')) {
+                        VisualAssignmentScope.ALBUM
+                    } else {
+                        VisualAssignmentScope.CATEGORY
+                    }
+                    explicitVisualRule(scope, row.key)?.visualId?.let(::visualNameForId)
+                }
+            }
         }
     }
 
-    private fun assignVisualRuleFromUi(option: SaberCommandResponseParser.TrackVisualOption) {
-        val scope = selectedAssignmentScopeFromUi()
-        val trackPath = activeTrackPath() ?: selectedTrackPath
-        val scopeKey = VisualAssignmentResolver.scopeKeyForTrack(scope, trackPath)
-        if (scopeKey.isNullOrBlank()) {
+    private fun trackRowSubtitle(row: SaberCommandResponseParser.TrackRow): String? {
+        return explicitVisualNameForRow(row)?.let { "Visual: $it" }
+    }
+
+    private fun assignVisualRuleToSelectedTarget(option: SaberCommandResponseParser.TrackVisualOption) {
+        val target = selectedVisualAssignmentTarget()
+        if (target == null) {
             visualsStatus = "Select a track or folder before assigning a visual."
             renderAll()
             return
         }
         visualAssignmentRules = visualAssignmentRules
-            .filterNot { it.scope == scope && it.scopeKey == scopeKey }
+            .filterNot { it.scope == target.scope && it.scopeKey == target.scopeKey }
             .plus(
                 VisualAssignmentRule(
-                    scope = scope,
-                    scopeKey = scopeKey,
+                    scope = target.scope,
+                    scopeKey = target.scopeKey,
                     visualId = option.id
                 )
             )
         visualAssignmentStore.saveRules(visualAssignmentRules)
-        visualsStatus = "Mapped ${option.name} to ${displayAssignmentScope(scope, scopeKey)}"
+        visualsStatus = "Mapped ${option.name} to ${target.label}"
         renderAll()
     }
 
-    private fun clearVisualRuleFromUi() {
-        val scope = selectedAssignmentScopeFromUi()
-        val trackPath = activeTrackPath() ?: selectedTrackPath
-        val scopeKey = VisualAssignmentResolver.scopeKeyForTrack(scope, trackPath)
-        if (scopeKey.isNullOrBlank()) {
-            visualsStatus = "No assignment scope available to clear."
+    private fun clearVisualRuleForSelectedTarget() {
+        val target = selectedVisualAssignmentTarget()
+        if (target == null) {
+            visualsStatus = "No selected track or folder mapping to clear."
             renderAll()
             return
         }
-        val updatedRules = visualAssignmentRules.filterNot { it.scope == scope && it.scopeKey == scopeKey }
+        val updatedRules = visualAssignmentRules.filterNot {
+            it.scope == target.scope && it.scopeKey == target.scopeKey
+        }
         if (updatedRules.size == visualAssignmentRules.size) {
-            visualsStatus = "No saved visual mapping for ${displayAssignmentScope(scope, scopeKey)}"
+            visualsStatus = "No saved visual mapping for ${target.label}"
             renderAll()
             return
         }
         visualAssignmentRules = updatedRules
         visualAssignmentStore.saveRules(visualAssignmentRules)
-        visualsStatus = "Cleared mapping for ${displayAssignmentScope(scope, scopeKey)}"
+        visualsStatus = "Cleared mapping for ${target.label}"
+        renderAll()
+    }
+
+    private fun assignDefaultVisualRule(option: SaberCommandResponseParser.TrackVisualOption) {
+        val defaultKey = VisualAssignmentResolver.scopeKeyForTrack(VisualAssignmentScope.DEFAULT, null)
+            ?: return
+        visualAssignmentRules = visualAssignmentRules
+            .filterNot { it.scope == VisualAssignmentScope.DEFAULT && it.scopeKey == defaultKey }
+            .plus(
+                VisualAssignmentRule(
+                    scope = VisualAssignmentScope.DEFAULT,
+                    scopeKey = defaultKey,
+                    visualId = option.id
+                )
+            )
+        visualAssignmentStore.saveRules(visualAssignmentRules)
+        visualsStatus = "Mapped ${option.name} to default playback"
+        renderAll()
+    }
+
+    private fun clearDefaultVisualRule() {
+        val defaultKey = VisualAssignmentResolver.scopeKeyForTrack(VisualAssignmentScope.DEFAULT, null)
+            ?: return
+        val updatedRules = visualAssignmentRules.filterNot {
+            it.scope == VisualAssignmentScope.DEFAULT && it.scopeKey == defaultKey
+        }
+        if (updatedRules.size == visualAssignmentRules.size) {
+            visualsStatus = "No default visual mapping to clear."
+            renderAll()
+            return
+        }
+        visualAssignmentRules = updatedRules
+        visualAssignmentStore.saveRules(visualAssignmentRules)
+        visualsStatus = "Cleared default visual mapping"
         renderAll()
     }
 
@@ -2195,40 +2188,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildVisualAssignmentSummary(): String {
-        val trackPath = activeTrackPath() ?: selectedTrackPath
-        val resolution = VisualAssignmentResolver.resolve(
-            trackPath = trackPath,
-            overrideVisualId = sessionOverrideVisualId,
-            rules = visualAssignmentRules
-        )
-        val visualName = when {
-            (sessionOverrideVisualId ?: 0) > 0 ->
-                trackVisualOptions.firstOrNull { it.id == sessionOverrideVisualId }?.name
-                    ?: "Visual #$sessionOverrideVisualId"
-            resolution.visualId != null ->
-                trackVisualOptions.firstOrNull { it.id == resolution.visualId }?.name
-                    ?: "Visual #${resolution.visualId}"
-            else -> displaySelectedTrackVisual()
+        val target = selectedVisualAssignmentTarget()
+        val targetSummary = if (target != null) {
+            val explicit = explicitVisualRule(target.scope, target.scopeKey)?.visualId?.let(::visualNameForId)
+            if (explicit != null) {
+                "Selected: ${target.label} -> $explicit"
+            } else {
+                "Selected: ${target.label} has no explicit mapping"
+            }
+        } else {
+            getString(R.string.visual_target_none)
         }
-
-        return when {
-            (sessionOverrideVisualId ?: 0) > 0 -> "Session override: $visualName"
-            resolution.matchedScope != null && resolution.matchedScopeKey != null ->
-                "Mapped ${displayAssignmentScope(resolution.matchedScope, resolution.matchedScopeKey)} -> $visualName"
-            else -> getString(R.string.visual_assignment_default_summary)
-        }
-    }
-
-    private fun buildMusicVisualSummary(): String {
-        val policy = displayTrackPolicy(trackPolicy)
-        val runtime = when {
-            trackVisualPreviewActive == true -> "Preview active"
-            trackVisualActive == true -> "Visual active"
-            trackSessionMode == "preserve" -> "Saber preserved"
-            trackSessionMode == "visual" -> "Music visual ready"
-            else -> "Use mappings"
-        }
-        return "$policy | $runtime"
+        val defaultSummary = defaultVisualRule()?.visualId?.let(::visualNameForId)
+            ?.let { "Default: $it" }
+            ?: "Default: none"
+        return "$targetSummary | $defaultSummary"
     }
 
     private fun displayAssignmentScope(scope: VisualAssignmentScope, scopeKey: String): String {
@@ -2260,6 +2234,16 @@ class MainActivity : AppCompatActivity() {
             "visual" -> getString(R.string.track_policy_visual)
             null -> getString(R.string.state_unknown)
             else -> policy.replace('_', ' ')
+        }
+    }
+
+    private fun displayConnectionState(state: ConnectionState): String {
+        return when (state) {
+            ConnectionState.DISCONNECTED -> "Disconnected"
+            ConnectionState.CONNECTING -> "Connecting"
+            ConnectionState.DISCOVERING -> "Syncing"
+            ConnectionState.READY -> "Ready"
+            else -> state.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
         }
     }
 

@@ -26,6 +26,8 @@
     <string name="music_visuals_sheet_title">Track Visuals</string>
     <string name="effects">Effects</string>
     <string name="visuals">Visuals</string>
+    <string name="assign_visual">Assign Visual</string>
+    <string name="assign_visual_title">Assign Track Visual</string>
     <string name="sync_short">Sync</string>
     <string name="refresh_short">Refresh</string>
     <string name="apply_short">Apply</string>
@@ -88,6 +90,8 @@
     <string name="track_visual_hint">Auto preserves saber behavior while the blade is on and uses the selected music visual while the blade is off. Saber always preserves the active saber state. Music requires the blade to be off and rejects playback when the blade is already on.</string>
     <string name="track_visual_policy_label">Playback mode</string>
     <string name="track_visual_selected_label">Selected track visual</string>
+    <string name="visual_target_label">Selected target</string>
+    <string name="visual_target_none">Select a track or folder on the Music page first.</string>
     <string name="track_visual_override_label">Temporary override</string>
     <string name="track_visual_runtime_label">Runtime state</string>
     <string name="track_visual_track_label">Current track</string>
@@ -106,6 +110,10 @@
     <string name="clear_visual">Clear</string>
     <string name="preview_visual">Preview</string>
     <string name="stop_preview">Stop Preview</string>
+    <string name="assign_to_selection">Assign to Selection</string>
+    <string name="clear_selection_assignment">Clear Selection</string>
+    <string name="set_default_visual">Set Default</string>
+    <string name="clear_default_visual">Clear Default</string>
     <string name="track_visual_none">None</string>
     <string name="visual_assignment_default_summary">Use mappings to bind visuals by track, album, category, or default.</string>
     <string name="visual_override_use_mappings">Use mappings</string>

@@ -338,6 +338,10 @@ object SaberCommandResponseParser {
             .ifBlank { null }
     }
 
+    fun isRootTrackHeaderKey(headerKey: String?): Boolean {
+        return headerKey == ROOT_TRACKS_HEADER_KEY
+    }
+
     fun tracksForHeader(
         trackPaths: List<String>,
         headerKey: String?

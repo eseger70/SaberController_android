@@ -112,6 +112,16 @@ cd C:\Backup\Eric\sandbox\android\SaberController
 powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_baseline_set.ps1
 ```
 
+The helper script prints a short checklist before each capture. The default set means:
+
+- `saber_ready`: Saber tab, connected, blade off, no sheet open
+- `saber_blade_on`: Saber tab, connected, blade on, no sheet open
+- `music_idle`: Music tab, nothing playing, track list visible
+- `music_playing`: Music tab, active playback, now playing and progress visible
+- `music_paused`: Music tab, paused playback, progress frozen
+- `music_visuals_sheet`: Music tab with the Visuals bottom sheet open
+- `effects_sheet`: Saber tab with the Effects bottom sheet open
+
 Compare a candidate screenshot to a saved baseline:
 
 ```powershell

@@ -42,6 +42,46 @@ powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_baseline_set.ps1
 
 The script pauses before each named state so you can put the phone on the correct screen and then capture it into `dev_docs\captures\baseline`.
 
+Default baseline states:
+
+- `saber_ready`
+  - Saber tab
+  - connected
+  - blade off
+  - normal preset selected
+  - no bottom sheet open
+- `saber_blade_on`
+  - Saber tab
+  - connected
+  - blade physically on
+  - normal preset selected
+  - no bottom sheet open
+- `music_idle`
+  - Music tab
+  - connected
+  - no track playing or paused
+  - track list visible
+  - no bottom sheet open
+- `music_playing`
+  - Music tab
+  - track actively playing
+  - now playing card and progress row visible
+  - no bottom sheet open
+- `music_paused`
+  - Music tab
+  - track paused, not stopped
+  - now playing card and frozen progress row visible
+  - no bottom sheet open
+- `music_visuals_sheet`
+  - Music tab
+  - Visuals bottom sheet open
+  - controls visible in resting state
+  - do not leave a dropdown expanded unless you are intentionally testing the dropdown
+- `effects_sheet`
+  - Saber tab
+  - Effects bottom sheet open
+  - instant and sustained effect controls visible
+
 ## 4. Compare before / after states
 
 Use the compare script to generate a diff image and a pixel-difference summary:

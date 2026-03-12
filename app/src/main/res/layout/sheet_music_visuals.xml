@@ -87,7 +87,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:background="@drawable/bg_chip_neutral" />
+            android:background="@drawable/bg_chip_neutral"
+            android:popupBackground="@drawable/bg_spinner_popup" />
 
         <TextView
             android:layout_width="match_parent"
@@ -140,7 +141,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:background="@drawable/bg_chip_neutral" />
+            android:background="@drawable/bg_chip_neutral"
+            android:popupBackground="@drawable/bg_spinner_popup" />
 
         <TextView
             android:layout_width="match_parent"
@@ -155,7 +157,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:background="@drawable/bg_chip_neutral" />
+            android:background="@drawable/bg_chip_neutral"
+            android:popupBackground="@drawable/bg_spinner_popup" />
 
         <TextView
             android:layout_width="match_parent"

@@ -297,6 +297,41 @@
                     app:backgroundTint="@color/app_surface_alt" />
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/volume_label"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                    android:textColor="@color/app_text_secondary" />
+
+                <TextView
+                    android:id="@+id/textMusicVolumeValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:minWidth="36dp"
+                    android:text="@string/volume_unknown"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                    android:textColor="@color/app_primary" />
+
+                <SeekBar
+                    android:id="@+id/seekMusicVolume"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:max="2000"
+                    android:progressTint="@color/app_primary"
+                    android:thumbTint="@color/app_primary" />
+            </LinearLayout>
+
             <ListView
                 android:id="@+id/listTracks"
                 android:layout_width="match_parent"

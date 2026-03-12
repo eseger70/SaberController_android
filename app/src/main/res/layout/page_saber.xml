@@ -207,25 +207,12 @@
 
                 <TextView
                     android:id="@+id/textVolumeValue"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
-                    android:layout_weight="1"
                     android:text="@string/volume_unknown"
                     android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
                     android:textColor="@color/app_primary" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/buttonRefreshVolume"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minHeight="38dp"
-                    android:text="@string/refresh_short"
-                    android:textColor="@color/app_text_primary"
-                    app:backgroundTint="@color/app_surface_alt"
-                    app:cornerRadius="14dp"
-                    app:icon="@android:drawable/ic_popup_sync" />
             </LinearLayout>
 
             <SeekBar

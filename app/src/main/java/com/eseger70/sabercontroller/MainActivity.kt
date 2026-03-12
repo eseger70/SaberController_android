@@ -28,6 +28,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.viewpager2.widget.ViewPager2
 import com.eseger70.sabercontroller.ble.SaberBleManager
 import com.eseger70.sabercontroller.ble.SaberBleManager.ConnectionState
 import com.eseger70.sabercontroller.ble.SaberCommandResponseParser
@@ -233,6 +234,12 @@ class MainActivity : AppCompatActivity() {
         )
         binding.viewPager.adapter = pagerAdapter
         binding.viewPager.offscreenPageLimit = 2
+        binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                super.onPageSelected(position)
+                requestVolumeRefreshForPage(position)
+            }
+        })
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = when (position) {
@@ -355,11 +362,6 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonOpenEffects.setOnClickListener {
             showEffectsBottomSheet()
         }
-        pageBinding.buttonRefreshVolume.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { refreshVolumeInternal() }
-            }
-        }
         pageBinding.listPresets.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             when (val row = presetRows.getOrNull(position)) {
                 is SaberCommandResponseParser.PresetRow.Header -> togglePresetHeader(row.entry.index)
@@ -447,6 +449,22 @@ class MainActivity : AppCompatActivity() {
         }
         pageBinding.buttonExpandAllTracks.setOnClickListener { expandAllTrackHeaders() }
         pageBinding.buttonCollapseAllTracks.setOnClickListener { collapseAllTrackHeaders() }
+        pageBinding.seekMusicVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || suppressVolumeCallbacks) return
+                pageBinding.textMusicVolumeValue.text = progress.toString()
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                if (suppressVolumeCallbacks) return
+                val targetVolume = seekBar?.progress ?: return
+                runWithBlePermissions {
+                    launchBleTask { setVolumeInternal(targetVolume) }
+                }
+            }
+        })
         pageBinding.listTracks.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             when (val row = trackRows.getOrNull(position)) {
                 is SaberCommandResponseParser.TrackRow.Header -> {
@@ -799,6 +817,13 @@ class MainActivity : AppCompatActivity() {
     private suspend fun syncTrackVisualPageInternal() {
         refreshTrackVisualOptionsInternal(logCompletion = false)
         refreshNowPlayingInternal(logCompletion = false)
+    }
+
+    private fun requestVolumeRefreshForPage(position: Int) {
+        if (position !in 0..1 || currentConnectionState != ConnectionState.READY) return
+        runWithBlePermissions {
+            launchBleTask { refreshVolumeInternal(logCompletion = false) }
+        }
     }
 
     private suspend fun syncSaberPageInternal() {
@@ -1491,7 +1516,6 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonSyncSaber.isEnabled = canInteract
         pageBinding.buttonOpenEffects.isEnabled = canInteract
         pageBinding.listPresets.isEnabled = canInteract && presetRows.isNotEmpty()
-        pageBinding.buttonRefreshVolume.isEnabled = canInteract
         pageBinding.seekVolume.isEnabled = canInteract
         bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
     }
@@ -1562,8 +1586,10 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonShuffleQueue.isEnabled = canInteract && queueTrackCount > 0
         pageBinding.buttonExpandAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
         pageBinding.buttonCollapseAllTracks.isEnabled = canInteract && trackPaths.isNotEmpty()
+        pageBinding.seekMusicVolume.isEnabled = canInteract
         pageBinding.listTracks.isEnabled = canInteract && trackRows.isNotEmpty()
         pageBinding.buttonOpenMusicVisuals.isEnabled = canInteract
+        bindVolume(pageBinding.textMusicVolumeValue, pageBinding.seekMusicVolume)
         pageBinding.buttonTogglePauseTrack.icon = AppCompatResources.getDrawable(
             this,
             if (trackPaused == true) R.drawable.ic_control_play else R.drawable.ic_control_pause

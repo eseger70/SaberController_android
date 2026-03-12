@@ -33,6 +33,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_screenshot.ps1 -Na
 
 By default this writes to `dev_docs\captures`.
 
+To capture the standard baseline set in one guided pass:
+
+```powershell
+cd C:\Backup\Eric\sandbox\android\SaberController
+powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_baseline_set.ps1
+```
+
+The script pauses before each named state so you can put the phone on the correct screen and then capture it into `dev_docs\captures\baseline`.
+
 ## 4. Compare before / after states
 
 Use the compare script to generate a diff image and a pixel-difference summary:

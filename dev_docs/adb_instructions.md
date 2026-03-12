@@ -105,6 +105,13 @@ cd C:\Backup\Eric\sandbox\android\SaberController
 powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_screenshot.ps1 -Name music_playing
 ```
 
+Capture the standard baseline screenshot set in one guided pass:
+
+```powershell
+cd C:\Backup\Eric\sandbox\android\SaberController
+powershell -ExecutionPolicy Bypass -File .\scripts\capture_ui_baseline_set.ps1
+```
+
 Compare a candidate screenshot to a saved baseline:
 
 ```powershell

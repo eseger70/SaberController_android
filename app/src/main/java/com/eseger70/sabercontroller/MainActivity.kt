@@ -82,6 +82,9 @@ class MainActivity : AppCompatActivity() {
     private var pendingPermissionAction: (() -> Unit)? = null
     private var currentConnectionState: ConnectionState = ConnectionState.DISCONNECTED
     private var suppressVolumeCallbacks = false
+    private var suppressTrackPolicyCallbacks = false
+    private var suppressTrackVisualSpinnerCallbacks = false
+    private var pendingTrackVisualSelectionId: Int? = null
 
     private var saberPageBinding: PageSaberBinding? = null
     private var tracksPageBinding: PageTracksBinding? = null
@@ -515,6 +518,7 @@ class MainActivity : AppCompatActivity() {
             setOnDismissListener {
                 musicVisualsSheetBinding = null
                 musicVisualsBottomSheet = null
+                pendingTrackVisualSelectionId = null
             }
         }
 
@@ -522,8 +526,25 @@ class MainActivity : AppCompatActivity() {
             sheetBinding.spinnerTrackVisuals.adapter = trackVisualAdapter
         }
 
+        sheetBinding.spinnerTrackVisuals.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    if (suppressTrackVisualSpinnerCallbacks) return
+                    pendingTrackVisualSelectionId =
+                        trackVisualOptions.getOrNull(position)?.id ?: 0
+                    renderMusicVisualsSheet()
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
+
         sheetBinding.toggleTrackPolicy.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
+            if (suppressTrackPolicyCallbacks || !isChecked) return@addOnButtonCheckedListener
             runWithBlePermissions {
                 when (checkedId) {
                     R.id.buttonPolicyAuto -> launchBleTask { setTrackPolicyInternal("auto") }
@@ -1310,6 +1331,7 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun setTrackVisualInternal(option: SaberCommandResponseParser.TrackVisualOption) {
         val command = if (option.id == 0) "tvc" else "tvs ${option.id}"
+        pendingTrackVisualSelectionId = option.id
         visualsStatus = if (option.id == 0) {
             "Clearing track visual selection"
         } else {
@@ -1625,11 +1647,17 @@ class MainActivity : AppCompatActivity() {
         trackVisualAdapter.addAll(trackVisualOptions.map { option -> option.name })
         trackVisualAdapter.notifyDataSetChanged()
 
-        val selectedIndex = trackVisualOptions.indexOfFirst { option ->
-            option.id == (trackVisualSelectedId ?: 0)
-        }
+        val desiredVisualId = pendingTrackVisualSelectionId
+            ?.takeIf { desired -> trackVisualOptions.any { option -> option.id == desired } }
+            ?: (trackVisualSelectedId ?: 0)
+        val selectedIndex = trackVisualOptions.indexOfFirst { option -> option.id == desiredVisualId }
         if (selectedIndex >= 0 && pageBinding.spinnerTrackVisuals.selectedItemPosition != selectedIndex) {
-            pageBinding.spinnerTrackVisuals.setSelection(selectedIndex, false)
+            suppressTrackVisualSpinnerCallbacks = true
+            try {
+                pageBinding.spinnerTrackVisuals.setSelection(selectedIndex, false)
+            } finally {
+                suppressTrackVisualSpinnerCallbacks = false
+            }
         }
 
         pageBinding.buttonPolicyAuto.isEnabled = canInteract
@@ -1674,10 +1702,15 @@ class MainActivity : AppCompatActivity() {
                 else -> hasDefaultMapping
             }
 
-        when (trackPolicy) {
-            "visual" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyMusic)
-            "preserve" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicySaber)
-            else -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyAuto)
+        suppressTrackPolicyCallbacks = true
+        try {
+            when (trackPolicy) {
+                "visual" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyMusic)
+                "preserve" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicySaber)
+                else -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyAuto)
+            }
+        } finally {
+            suppressTrackPolicyCallbacks = false
         }
     }
 
@@ -2078,6 +2111,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectedTrackVisualOptionFromMusicUi(): SaberCommandResponseParser.TrackVisualOption? {
+        pendingTrackVisualSelectionId?.let { selectedId ->
+            trackVisualOptions.firstOrNull { option -> option.id == selectedId }?.let { return it }
+        }
         val pageBinding = musicVisualsSheetBinding ?: return null
         return pageBinding.spinnerTrackVisuals.selectedItemPosition
             .takeIf { it in trackVisualOptions.indices }

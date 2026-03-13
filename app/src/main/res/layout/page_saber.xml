@@ -64,7 +64,7 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/buttonOn"
+                    android:id="@+id/buttonToggleBlade"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -74,31 +74,6 @@
                     app:backgroundTint="@color/app_on_color"
                     app:cornerRadius="16dp"
                     app:icon="@android:drawable/ic_lock_idle_charging" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/buttonOff"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/off"
-                    android:textColor="@color/app_on_primary"
-                    app:backgroundTint="@color/app_off_color"
-                    app:cornerRadius="16dp"
-                    app:icon="@android:drawable/ic_media_pause" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/buttonSyncSaber"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/sync_short"
-                    android:textColor="@color/app_text_primary"
-                    app:backgroundTint="@color/app_surface"
-                    app:cornerRadius="16dp"
-                    app:icon="@android:drawable/ic_popup_sync" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonOpenEffects"

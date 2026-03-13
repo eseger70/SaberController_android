@@ -237,7 +237,7 @@ class MainActivity : AppCompatActivity() {
         binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
-                requestVolumeRefreshForPage(position)
+                requestPageRefreshForPage(position)
             }
         })
 
@@ -344,19 +344,9 @@ class MainActivity : AppCompatActivity() {
             pageBinding.listPresets.adapter = presetAdapter
         }
 
-        pageBinding.buttonOn.setOnClickListener {
+        pageBinding.buttonToggleBlade.setOnClickListener {
             runWithBlePermissions {
-                launchBleTask { setBladePowerInternal(isOn = true) }
-            }
-        }
-        pageBinding.buttonOff.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { setBladePowerInternal(isOn = false) }
-            }
-        }
-        pageBinding.buttonSyncSaber.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { syncSaberPageInternal() }
+                launchBleTask { setBladePowerInternal(isOn = bladeState != true) }
             }
         }
         pageBinding.buttonOpenEffects.setOnClickListener {
@@ -399,11 +389,6 @@ class MainActivity : AppCompatActivity() {
             pageBinding.listTracks.adapter = trackAdapter
         }
 
-        pageBinding.buttonRefreshTracks.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { refreshTrackListInternal() }
-            }
-        }
         pageBinding.buttonStopTrack.setOnClickListener {
             runWithBlePermissions {
                 launchBleTask { stopTrackInternal() }
@@ -550,37 +535,35 @@ class MainActivity : AppCompatActivity() {
         sheetBinding.buttonApplyTrackVisual.setOnClickListener {
             val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
             runWithBlePermissions {
-                launchBleTask { setTrackVisualInternal(option) }
+                launchBleTask {
+                    if (option.id == 0) {
+                        clearTrackVisualInternal()
+                    } else {
+                        setTrackVisualInternal(option)
+                    }
+                }
             }
         }
-        sheetBinding.buttonClearTrackVisual.setOnClickListener {
+        sheetBinding.buttonToggleTrackVisualPreview.setOnClickListener {
             runWithBlePermissions {
-                launchBleTask { clearTrackVisualInternal() }
-            }
-        }
-        sheetBinding.buttonPreviewTrackVisual.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { previewTrackVisualInternal() }
-            }
-        }
-        sheetBinding.buttonStopTrackVisualPreview.setOnClickListener {
-            runWithBlePermissions {
-                launchBleTask { stopTrackVisualPreviewInternal() }
+                launchBleTask {
+                    if (trackVisualPreviewActive == true) {
+                        stopTrackVisualPreviewInternal()
+                    } else {
+                        previewTrackVisualInternal()
+                    }
+                }
             }
         }
         sheetBinding.buttonAssignTrackVisual.setOnClickListener {
             val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
-            assignVisualRuleToSelectedTarget(option)
-        }
-        sheetBinding.buttonClearVisualAssignment.setOnClickListener {
-            clearVisualRuleForSelectedTarget()
-        }
-        sheetBinding.buttonAssignDefaultVisual.setOnClickListener {
-            val option = selectedTrackVisualOptionFromMusicUi() ?: return@setOnClickListener
-            assignDefaultVisualRule(option)
-        }
-        sheetBinding.buttonClearDefaultVisual.setOnClickListener {
-            clearDefaultVisualRule()
+            val target = selectedVisualAssignmentTarget()
+            when {
+                target != null && option.id != 0 -> assignVisualRuleToSelectedTarget(option)
+                target != null -> clearVisualRuleForSelectedTarget()
+                option.id != 0 -> assignDefaultVisualRule(option)
+                else -> clearDefaultVisualRule()
+            }
         }
 
         if (trackVisualOptions.isEmpty()) {
@@ -819,10 +802,15 @@ class MainActivity : AppCompatActivity() {
         refreshNowPlayingInternal(logCompletion = false)
     }
 
-    private fun requestVolumeRefreshForPage(position: Int) {
+    private fun requestPageRefreshForPage(position: Int) {
         if (position !in 0..1 || currentConnectionState != ConnectionState.READY) return
         runWithBlePermissions {
-            launchBleTask { refreshVolumeInternal(logCompletion = false) }
+            launchBleTask {
+                when (position) {
+                    0 -> syncSaberPageInternal()
+                    else -> syncMusicPageInternal()
+                }
+            }
         }
     }
 
@@ -830,6 +818,12 @@ class MainActivity : AppCompatActivity() {
         refreshBladeStateInternal(logCompletion = false)
         refreshPresetListInternal()
         refreshCurrentPresetInternal(logCompletion = false)
+        refreshVolumeInternal(logCompletion = false)
+    }
+
+    private suspend fun syncMusicPageInternal() {
+        refreshTrackListInternal()
+        refreshNowPlayingInternal(logCompletion = false)
         refreshVolumeInternal(logCompletion = false)
     }
 
@@ -1359,7 +1353,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        visualsStatus = "Previewing ${option.name}"
+        visualsStatus = "Turning on ${option.name}"
         renderAll()
 
         val result = runCommand(
@@ -1373,13 +1367,13 @@ class MainActivity : AppCompatActivity() {
         visualsStatus = when (state?.visualPreviewRejectedReason) {
             "blade_on" -> "Preview requires the blade to be off."
             "track_active" -> "Stop track playback before starting a preview."
-            else -> "Previewing ${option.name}"
+            else -> "${option.name} is on"
         }
         renderAll()
     }
 
     private suspend fun stopTrackVisualPreviewInternal() {
-        visualsStatus = "Stopping track visual preview"
+        visualsStatus = "Turning track visual off"
         renderAll()
 
         val result = runCommand(
@@ -1390,7 +1384,7 @@ class MainActivity : AppCompatActivity() {
         if (!result.success) return
 
         applyTrackRuntimeState(result.response)
-        visualsStatus = "Track visual preview stopped"
+        visualsStatus = "Track visual is off"
         renderAll()
     }
 
@@ -1511,12 +1505,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         val canInteract = currentConnectionState == ConnectionState.READY
-        pageBinding.buttonOn.isEnabled = canInteract && currentPreset?.isHeader != true
-        pageBinding.buttonOff.isEnabled = canInteract
-        pageBinding.buttonSyncSaber.isEnabled = canInteract
+        val canIgnite = canInteract && currentPreset?.isHeader != true
+        pageBinding.buttonToggleBlade.isEnabled = if (bladeState == true) canInteract else canIgnite
         pageBinding.buttonOpenEffects.isEnabled = canInteract
         pageBinding.listPresets.isEnabled = canInteract && presetRows.isNotEmpty()
         pageBinding.seekVolume.isEnabled = canInteract
+        val bladeOn = bladeState == true
+        pageBinding.buttonToggleBlade.text = getString(if (bladeOn) R.string.off else R.string.on)
+        pageBinding.buttonToggleBlade.icon = AppCompatResources.getDrawable(
+            this,
+            if (bladeOn) android.R.drawable.ic_media_pause else android.R.drawable.ic_lock_idle_charging
+        )
+        pageBinding.buttonToggleBlade.backgroundTintList = ContextCompat.getColorStateList(
+            this,
+            if (bladeOn) R.color.app_off_color else R.color.app_on_color
+        )
         bindVolume(pageBinding.textVolumeValue, pageBinding.seekVolume)
     }
 
@@ -1575,7 +1578,6 @@ class MainActivity : AppCompatActivity() {
         val canInteract = currentConnectionState == ConnectionState.READY
         val queueScopeKey = resolveTrackQueueScopeKey()
         val queueTrackCount = activeQueueForScope(queueScopeKey).size
-        pageBinding.buttonRefreshTracks.isEnabled = canInteract
         pageBinding.buttonStopTrack.isEnabled = canInteract && (nowPlaying != null || trackPaused == true)
         pageBinding.buttonPlayTrackGroup.isEnabled = canInteract && queueTrackCount > 0
         pageBinding.buttonPreviousTrack.isEnabled = canInteract && queueTrackCount > 0
@@ -1633,15 +1635,44 @@ class MainActivity : AppCompatActivity() {
         pageBinding.buttonPolicyAuto.isEnabled = canInteract
         pageBinding.buttonPolicySaber.isEnabled = canInteract
         pageBinding.buttonPolicyMusic.isEnabled = canInteract
-        pageBinding.buttonApplyTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
-        pageBinding.buttonClearTrackVisual.isEnabled = canInteract && (trackVisualSelectedId ?: 0) != 0
-        pageBinding.buttonPreviewTrackVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
-        pageBinding.buttonStopTrackVisualPreview.isEnabled = canInteract && trackVisualPreviewActive == true
+        val selectedOption = selectedTrackVisualOptionFromMusicUi()
+            ?: trackVisualOptions.firstOrNull { it.id == (trackVisualSelectedId ?: 0) }
+        val selectedOptionId = selectedOption?.id ?: 0
+        val hasSelectionMapping = target?.let { explicitVisualRule(it.scope, it.scopeKey) } != null
+        val hasDefaultMapping = defaultVisualRule() != null
+        pageBinding.buttonApplyTrackVisual.text = getString(
+            if (selectedOptionId == 0) R.string.track_visual_clear_current else R.string.track_visual_use_for_playback
+        )
+        pageBinding.buttonApplyTrackVisual.isEnabled =
+            canInteract && if (selectedOptionId == 0) {
+                (trackVisualSelectedId ?: 0) != 0
+            } else {
+                trackVisualOptions.isNotEmpty()
+            }
+        pageBinding.buttonToggleTrackVisualPreview.text = getString(
+            if (trackVisualPreviewActive == true) R.string.track_visual_turn_off else R.string.track_visual_turn_on
+        )
+        pageBinding.buttonToggleTrackVisualPreview.isEnabled =
+            canInteract && if (trackVisualPreviewActive == true) {
+                true
+            } else {
+                (selectedOptionId != 0) || ((trackVisualSelectedId ?: 0) != 0)
+            }
+        pageBinding.buttonAssignTrackVisual.text = getString(
+            when {
+                target != null && selectedOptionId != 0 -> R.string.assign_to_selection
+                target != null -> R.string.clear_selection_assignment
+                selectedOptionId != 0 -> R.string.set_default_visual
+                else -> R.string.clear_default_visual
+            }
+        )
         pageBinding.buttonAssignTrackVisual.isEnabled =
-            canInteract && trackVisualOptions.isNotEmpty() && target != null
-        pageBinding.buttonClearVisualAssignment.isEnabled = canInteract && target != null
-        pageBinding.buttonAssignDefaultVisual.isEnabled = canInteract && trackVisualOptions.isNotEmpty()
-        pageBinding.buttonClearDefaultVisual.isEnabled = canInteract && defaultVisualRule() != null
+            canInteract && when {
+                target != null && selectedOptionId != 0 -> true
+                target != null -> hasSelectionMapping
+                selectedOptionId != 0 -> true
+                else -> hasDefaultMapping
+            }
 
         when (trackPolicy) {
             "visual" -> pageBinding.toggleTrackPolicy.check(R.id.buttonPolicyMusic)

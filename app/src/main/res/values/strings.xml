@@ -121,6 +121,10 @@
     <string name="visual_assignment_scope_album">Album</string>
     <string name="visual_assignment_scope_category">Category</string>
     <string name="visual_assignment_scope_default">Default</string>
+    <string name="track_visual_use_for_playback">Use for Playback</string>
+    <string name="track_visual_clear_current">Clear Current Visual</string>
+    <string name="track_visual_turn_on">Turn On</string>
+    <string name="track_visual_turn_off">Turn Off</string>
     <string name="track_session_visual">Music visual active</string>
     <string name="track_session_preserve">Preserving saber state</string>
     <string name="track_session_audio_only">Audio only</string>
